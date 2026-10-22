@@ -1,0 +1,946 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>簡易圖騰動畫產生器</title>
+<style>
+:root {
+  --bg: #f4f2ee; --panel: #ffffff; --card: #faf8f4; --line: #e4dfd6; --line2: #d6d0c4;
+  --text: #2a2620; --muted: #847c70; --accent: #c8901a; --accent-soft: #fbf1dc; --ok: #2f9a63; --bad: #d4513f; --run: #2f74c8;
+  --stage: #3a3a3c; --stage2: #333335; --stage-ink: #f2efe8;
+  --mono: Consolas, "IBM Plex Mono", monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 13.5px/1.55 "Microsoft JhengHei", "Noto Sans TC", sans-serif; overflow: hidden; }
+.app { height: 100vh; display: grid; grid-template-rows: auto auto minmax(0, 1fr); }
+button, select, input[type=text] { font: inherit; font-size: 13px; color: var(--text); background: var(--panel); border: 1px solid var(--line2); border-radius: 8px; padding: 6px 12px; }
+button { cursor: pointer; white-space: nowrap; }
+button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+button.primary { background: var(--text); border-color: var(--text); color: #fff; font-weight: 700; }
+button.primary:hover:not(:disabled) { color: #fff; background: #000; }
+button.gold { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+button.gold:hover:not(:disabled) { color: #fff; filter: brightness(1.06); }
+button:disabled { opacity: .45; cursor: default; }
+.muted { color: var(--muted); }
+.mono { font-family: var(--mono); }
+
+/* 頂列 */
+.top { display: flex; align-items: center; gap: 12px; padding: 10px 18px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.logo { width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffe9a8, #e0a92d 60%, #b47a12); flex: none; }
+.brand b { font-size: 17px; }
+.helper { font-size: 12px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; white-space: nowrap; cursor: pointer; background: transparent; color: var(--muted); }
+.helper.ok { color: #2f8a52; border-color: #2f8a52; } .helper.warn { color: #b07a10; border-color: #b07a10; } .helper.bad { color: #c0432b; border-color: #c0432b; }
+.checks { display: grid; gap: 6px; margin: 4px 0; } .checks div { display: flex; gap: 8px; align-items: baseline; } .checks i { font-style: normal; font-weight: 700; width: 1.2em; }
+.checks .y i { color: #5fcb8b; } .checks .n i { color: #f08068; } .checks small { color: #b9b3a8; }
+.offline code { background: rgba(255,255,255,.08); padding: 1px 6px; border-radius: 4px; font-family: var(--mono); font-size: 12px; word-break: break-all; }
+.brand .ver { font-family: var(--mono); font-size: 11px; border: 1px solid var(--accent); color: var(--accent); border-radius: 999px; padding: 0 7px; margin-left: 6px; }
+.brand span:not(.ver) { display: block; font-size: 12px; color: var(--muted); }
+.spacer { flex: 1; }
+.top details { position: relative; }
+.top details summary { cursor: pointer; list-style: none; font-size: 13px; color: var(--muted); padding: 6px 8px; }
+.top details[open] .adv { position: absolute; right: 0; top: 36px; z-index: 30; background: var(--panel); border: 1px solid var(--line2); border-radius: 10px; padding: 14px; width: 400px; display: grid; gap: 10px; box-shadow: 0 12px 30px rgba(0,0,0,.12); }
+.adv label { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.adv label.inline { display: flex; gap: 6px; align-items: flex-start; }
+.adv input[type=text] { width: 100%; }
+
+/* 流程進度 */
+.flow { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 10px 18px; background: var(--panel); border-bottom: 1px solid var(--line); gap: 6px; }
+.stage-step { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 0 10px; align-items: center; padding: 6px 10px 6px 6px; border-radius: 10px; cursor: pointer; }
+.stage-step:hover { background: var(--card); }
+.stage-step.view { background: var(--accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.stage-step .dot { grid-row: span 2; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-family: var(--mono); border: 2px solid var(--line2); color: var(--muted); background: var(--panel); }
+.stage-step b { font-size: 13.5px; }
+.stage-step small { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stage-step .bar { position: absolute; left: 44px; right: 10px; bottom: 2px; height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; display: none; }
+.stage-step .bar i { display: block; height: 100%; background: var(--run); width: 0; transition: width .3s; }
+.stage-step.done .dot { border-color: var(--ok); color: #fff; background: var(--ok); }
+.stage-step.done small { color: var(--ok); }
+.stage-step.fail .dot { border-color: var(--bad); color: #fff; background: var(--bad); }
+.stage-step.fail small { color: var(--bad); }
+.stage-step.run .dot { border-color: var(--run); color: var(--run); }
+.stage-step.run small { color: var(--run); }
+.stage-step.run .bar { display: block; }
+
+/* 主區 */
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }
+.center { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; }
+.stage { position: relative; min-height: 0; overflow: hidden; background: repeating-conic-gradient(var(--stage) 0 25%, var(--stage2) 0 50%) 0 0 / 24px 24px; color: var(--stage-ink); }
+.stage .frame { position: absolute; inset: 56px 24px 24px; display: grid; place-items: center; min-height: 0; }
+.chips { position: absolute; left: 16px; top: 14px; display: flex; gap: 8px; z-index: 5; }
+.chip { font-size: 12px; border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: 2px 10px; background: rgba(20,20,22,.55); }
+.chip.gold { border-color: var(--accent); color: #f3c96a; }
+.res { position: absolute; right: 16px; top: 16px; font-family: var(--mono); font-size: 11.5px; color: #e9c46a; z-index: 5; }
+/* 左上角進度回報 */
+.prog { position: absolute; left: 16px; top: 48px; z-index: 6; width: 300px; background: rgba(18,18,20,.82); border: 1px solid rgba(255,255,255,.18); border-radius: 10px; padding: 10px 12px; display: none; gap: 6px; backdrop-filter: blur(4px); }
+.prog.on { display: grid; }
+.prog .l1 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.prog .l1 b { font-size: 14px; }
+.prog .pct { font-family: var(--mono); font-size: 20px; font-weight: 700; color: #f3c96a; }
+.prog .l2 { font-size: 12px; color: #c9c4ba; display: flex; justify-content: space-between; }
+.prog .bar { height: 6px; background: rgba(255,255,255,.12); border-radius: 3px; overflow: hidden; }
+.prog .bar i { display: block; height: 100%; background: linear-gradient(90deg, #e3b85c, #f3d48a); width: 0; transition: width .3s; }
+.prog .bar.sub i { background: #6aa8f0; }
+.prog .q { font-size: 11.5px; color: #c9c4ba; border-top: 1px solid rgba(255,255,255,.12); padding-top: 6px; }
+
+/* 匯入指引 */
+.welcome { width: min(760px, 100%); background: rgba(24,24,26,.88); border: 1px solid rgba(255,255,255,.18); border-radius: 14px; padding: 26px 28px; display: grid; gap: 18px; }
+.welcome h2 { margin: 0; font-size: 20px; }
+.welcome .stepsx { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.welcome .stepsx div { border: 1px solid rgba(255,255,255,.14); border-radius: 10px; padding: 12px; font-size: 12.5px; color: #cfcac0; }
+.welcome .stepsx b { display: block; color: #f3c96a; font-size: 13.5px; margin-bottom: 4px; }
+.dropzone { border: 2px dashed rgba(243,201,106,.6); border-radius: 12px; padding: 26px; text-align: center; display: grid; gap: 10px; justify-items: center; }
+.dropzone.over { background: rgba(243,201,106,.12); border-color: #f3c96a; }
+.dropzone .big { font-size: 16px; font-weight: 700; }
+.welcome .exist { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 12.5px; color: #cfcac0; }
+.welcome .exist button { background: transparent; color: #f2efe8; border-color: rgba(255,255,255,.3); }
+.welcome .err { color: #ff9a8b; font-size: 12.5px; min-height: 1em; white-space: pre-line; }
+.welcome .sub-in { font-size: 12.5px; color: #b9b3a8; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.welcome .sub-in button { background: transparent; color: #f2efe8; border-color: rgba(255,255,255,.3); padding: 3px 10px; }
+.welcome input[type=text] { width: 100%; background: rgba(0,0,0,.35); color: #f2efe8; border-color: rgba(255,255,255,.3); }
+
+/* PSD 設定確認 */
+.setup { width: 100%; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; min-height: 0; }
+.setup .lyr, .setup .form { background: rgba(20,20,22,.86); border: 1px solid rgba(255,255,255,.16); border-radius: 12px; padding: 14px; min-height: 0; overflow: auto; display: grid; gap: 10px; align-content: start; }
+.setup h3 { margin: 0; font-size: 15px; display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.setup h3 small { font-weight: 400; color: #b9b3a8; font-size: 12px; word-break: break-all; }
+.lgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.lcard { border: 1px solid rgba(255,255,255,.16); border-radius: 10px; padding: 8px; display: grid; gap: 6px; background: rgba(0,0,0,.25); }
+.lcard.on { border-color: #f3c96a; box-shadow: 0 0 0 1px rgba(243,201,106,.4); }
+.lcard .th { height: 110px; display: grid; place-items: center; background: repeating-conic-gradient(#4a4a4c 0 25%, #404042 0 50%) 0 0 / 12px 12px; border-radius: 6px; }
+.lcard .th img { max-width: 100%; max-height: 104px; }
+.lcard label { display: flex; gap: 6px; align-items: center; font-size: 13px; font-weight: 700; }
+.lcard .meta { font-size: 11px; color: #b9b3a8; font-family: var(--mono); }
+.lcard .tag { font-size: 10.5px; border-radius: 4px; padding: 0 5px; background: rgba(243,201,106,.18); color: #f3c96a; margin-left: 4px; font-weight: 400; }
+.lcard input[type=text], .form input[type=text], .form input[type=number], .form select { width: 100%; background: rgba(0,0,0,.35); color: #f2efe8; border: 1px solid rgba(255,255,255,.25); border-radius: 6px; padding: 4px 8px; font: inherit; font-size: 12.5px; }
+.lcard input.bad, .form input.bad { border-color: #ff9a8b; }
+.form .f { display: grid; gap: 4px; font-size: 12.5px; color: #cfcac0; }
+.form .f > span { color: #b9b3a8; font-size: 12px; }
+.form .opt { display: flex; gap: 6px; align-items: flex-start; font-size: 12.5px; color: #e9e5dc; }
+.form .path { font-family: var(--mono); font-size: 11.5px; color: #f3c96a; word-break: break-all; }
+.form .note { font-size: 11.5px; color: #9a958c; }
+.form .acts { display: grid; gap: 8px; margin-top: 4px; }
+.skipped { font-size: 11.5px; color: #9a958c; }
+
+/* 舞台內容 */
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 240px)); gap: 12px; }
+.tile { background: rgba(20,20,22,.7); border: 1px solid rgba(255,255,255,.14); border-radius: 10px; padding: 10px; display: grid; gap: 6px; }
+.tile.cur { border-color: #6aa8f0; box-shadow: 0 0 0 2px rgba(106,168,240,.35); }
+.tile.ok { border-color: rgba(95,195,143,.6); }
+.tile .hd { display: flex; justify-content: space-between; font-size: 12px; color: #c9c4ba; }
+.tile .hd b { color: #fff; font-size: 14px; }
+.tile .pair { display: grid; grid-template-columns: 70px 14px minmax(0, 1fr); align-items: center; gap: 4px; min-height: 92px; }
+.tile .pair img { max-width: 100%; max-height: 120px; display: block; }
+.tile .pair .ph { height: 70px; border: 1px dashed rgba(255,255,255,.2); border-radius: 6px; display: grid; place-items: center; font-size: 11px; color: #9a958c; }
+.tile .facts { font-family: var(--mono); font-size: 11px; color: #c9c4ba; }
+.canvaswrap canvas { display: block; image-rendering: pixelated; box-shadow: 0 0 0 1px rgba(255,255,255,.2); }
+.atlasbox { position: relative; background: repeating-conic-gradient(#555 0 25%, #4a4a4a 0 50%) 0 0 / 12px 12px; outline: 1px dashed rgba(243,201,106,.7); }
+.atlasbox img { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.atlasbox .r { position: absolute; border: 1px solid #f3c96a; }
+.atlasbox .r span { position: absolute; left: 1px; top: 0; font-size: 10px; background: #f3c96a; color: #1a1408; padding: 0 3px; font-weight: 700; white-space: nowrap; }
+.card-on-stage { background: rgba(20,20,22,.82); border: 1px solid rgba(255,255,255,.18); border-radius: 12px; padding: 18px 20px; display: grid; gap: 10px; width: min(720px, 100%); font-size: 13px; }
+.card-on-stage h3 { margin: 0; font-size: 16px; }
+.card-on-stage table { border-collapse: collapse; width: 100%; }
+.card-on-stage td, .card-on-stage th { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,.12); text-align: left; font-size: 12.5px; }
+.card-on-stage th { color: #b9b3a8; font-weight: 500; }
+.card-on-stage a { color: #f3c96a; }
+.empty-stage { color: #cfcac0; font-size: 14px; text-align: center; display: grid; gap: 6px; }
+
+/* 控制列 */
+.controls { display: flex; align-items: center; gap: 14px; padding: 10px 18px; background: var(--panel); border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
+.controls .playbtn { width: 38px; height: 38px; border-radius: 50%; background: var(--accent); border: 0; color: #fff; font-size: 14px; padding: 0; }
+.controls .playbtn:hover:not(:disabled) { color: #fff; filter: brightness(1.06); }
+.controls input[type=range] { accent-color: var(--accent); }
+.controls #scrub { flex: 1; min-width: 200px; }
+.controls .val { font-family: var(--mono); color: var(--text); min-width: 11em; }
+.controls label { display: flex; gap: 6px; align-items: center; }
+.controls.off > :not(.offnote) { opacity: .4; pointer-events: none; }
+.controls .offnote { display: none; }
+.controls.off .offnote { display: block; }
+
+/* 右側資訊 */
+.side { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; background: var(--panel); border-left: 1px solid var(--line); }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); }
+.tabs button { border: 0; border-radius: 0; background: none; padding: 12px 0; font-weight: 700; color: var(--muted); border-bottom: 2px solid transparent; }
+.tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
+.tabpane { display: none; min-height: 0; overflow: auto; padding: 14px; gap: 12px; align-content: start; }
+.tabpane.on { display: grid; }
+.box { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 8px; background: var(--panel); }
+.box h4 { margin: 0; font-size: 13.5px; display: flex; justify-content: space-between; align-items: baseline; }
+.box h4 small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stat { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.stat b { font-size: 20px; font-family: var(--mono); }
+.stat span { display: block; font-size: 12px; color: var(--muted); }
+table.mini { border-collapse: collapse; width: 100%; font-size: 12px; }
+table.mini th, table.mini td { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+table.mini th { color: var(--muted); font-weight: 500; }
+table.mini td.n { font-family: var(--mono); }
+.y { color: var(--ok); } .x { color: var(--bad); }
+dl.kv { margin: 0; display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 3px 10px; font-size: 12.5px; }
+dl.kv dt { color: var(--muted); }
+dl.kv dd { margin: 0; word-break: break-all; }
+.curve svg { width: 100%; height: auto; display: block; }
+pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; padding: 10px; font: 11.5px/1.5 var(--mono); white-space: pre-wrap; overflow: auto; min-height: 260px; max-height: 100%; }
+.log .s { color: #f3c96a; font-weight: 700; } .log .e { color: #ff9a8b; } .log .g { color: #7fd6a4; }
+.side .foot { border-top: 1px solid var(--line); padding: 10px 14px; display: grid; gap: 8px; font-size: 12px; color: var(--muted); }
+.side .foot .row { display: flex; gap: 8px; }
+.side .foot button { flex: 1; }
+.badge { display: inline-block; font-size: 11.5px; padding: 0 8px; border-radius: 999px; font-weight: 700; }
+.badge.ok { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
+.badge.bad { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+.badge.none { background: var(--card); color: var(--muted); }
+
+.dropall { position: fixed; inset: 0; z-index: 50; background: rgba(20,18,14,.7); display: none; place-items: center; font-size: 22px; font-weight: 700; color: #f3c96a; border: 3px dashed #f3c96a; }
+.dropall.on { display: grid; }
+.toast { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); z-index: 60; background: var(--panel); border: 1px solid var(--line2); border-radius: 8px; padding: 8px 14px; font-size: 13px; display: none; box-shadow: 0 8px 20px rgba(0,0,0,.12); }
+.toast.on { display: block; }
+.toast.err { border-color: var(--bad); color: var(--bad); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="logo" aria-hidden="true"></div>
+    <div class="brand"><b>簡易圖騰動畫產生器</b><span class="ver">雛型</span><span>丟入 PSD → 拆圖 → Spine 動畫 → 確認尺寸 → 輸出 → 驗證 → 登記展示台</span></div>
+    <span class="spacer"></span>
+    <button class="helper" id="helperChip" title="本機小幫手（呼叫 Photoshop、Spine）">連線中…</button>
+    <select id="cfgSel" title="已匯入的設定檔"></select>
+    <button id="importBtn">丟入 PSD</button>
+    <input type="file" id="cfgFile" accept=".psd,.psb,.json" multiple hidden>
+    <details>
+      <summary>進階 ▾</summary>
+      <div class="adv">
+        <label>試跑資料夾（留空＝寫入設定檔的 Spine 專案資料夾；試跑不寫說明書動態圖、不登記展示台）<input type="text" id="spineDir" placeholder="例如 D:/tmp/test"></label>
+        <label class="inline"><input type="checkbox" id="force">Spine 編輯器開著同名專案也照跑（之後別在舊視窗存檔）</label>
+        <button id="reload">重新讀取輸出</button>
+      </div>
+    </details>
+    <button class="gold" id="runAll">開始執行</button>
+  </header>
+
+  <nav class="flow" id="flow"></nav>
+
+  <div class="main">
+    <div class="center">
+      <div class="stage" id="stage">
+        <div class="chips" id="chips"></div>
+        <div class="res" id="res"></div>
+        <div class="prog" id="prog">
+          <div class="l1"><b id="pStage"></b><span class="pct" id="pPct">0%</span></div>
+          <div class="l2"><span id="pStep"></span><span id="pItem" class="mono"></span></div>
+          <div class="bar sub"><i id="pSub"></i></div>
+          <div class="l2"><span>整體進度</span><span id="pAll" class="mono"></span></div>
+          <div class="bar"><i id="pBar"></i></div>
+          <div class="q" id="pQueue" hidden></div>
+        </div>
+        <div class="frame" id="frame"></div>
+      </div>
+      <div class="controls off" id="controls">
+        <button class="playbtn" id="play" title="播放／暫停">❚❚</button>
+        <input type="range" id="scrub" min="0" max="60" value="0">
+        <span class="val" id="frameVal">第 0 格・0.00 秒</span>
+        <label>速度 <select id="speed"><option value="1">1×</option><option value="0.5">0.5×</option><option value="0.25">0.25×</option></select></label>
+        <label>Spine 透明度 <input type="range" id="alpha" min="0" max="100" value="100" style="width:110px"><span class="mono" id="alphaVal">100%</span></label>
+        <label><input type="checkbox" id="showRef" checked>設定稿底圖</label>
+        <label><input type="checkbox" id="actual">實際像素 1:1</label>
+        <span class="offnote">輸出 Spine 後可在這裡播放與比對</span>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="tabs" id="tabs"><button data-t="result" class="on">結果</button><button data-t="cfg">設定</button><button data-t="files">檔案</button><button data-t="log">紀錄</button></div>
+      <div style="min-height:0;display:grid">
+        <div class="tabpane on" data-t="result" id="paneResult"></div>
+        <div class="tabpane" data-t="cfg"><div class="box"><h4>設定檔 <small id="cfgName" class="mono"></small></h4><dl class="kv" id="cfgKv"></dl></div><div class="box curve"><h4>動態樣板 <small id="curveTitle"></small></h4><svg id="curve" viewBox="0 0 360 150"></svg></div></div>
+        <div class="tabpane" data-t="files" id="paneFiles"></div>
+        <div class="tabpane" data-t="log" style="grid-template-rows:auto minmax(0,1fr)"><div class="row" style="display:flex;justify-content:space-between;font-size:12px" ><span class="muted">即時執行紀錄</span><span id="jobState"></span></div><pre class="log" id="log"></pre></div>
+      </div>
+      <div class="foot">
+        <div class="row"><button id="runStage">只跑目前這一段</button><button id="runFrom">從這一段跑到最後</button></div>
+        <button class="gold" id="openShowcase" hidden>開啟展示台 ↗</button>
+        <button class="gold" id="toBatch" hidden title="把這次輸出的 Export 與 Images 建成收件批次，接著跑資源檢查 → 圖片檢查 → 展示台 → 靜態工房">送進收件批次 →</button>
+        <span id="footNote">寫入正式資料夾前會先備份舊檔到工作區。</span>
+      </div>
+    </aside>
+  </div>
+</div>
+<div class="dropall" id="dropall">放開以匯入 PSD（可一次放多個，依序設定後執行）</div>
+<div class="toast" id="toast"></div>
+
+<script src="vendor/pixi.js"></script>
+<script src="vendor/pixi-spine.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const fileUrl = p => API + 'file/' + p.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/');
+  const bust = (u, t) => u + `?t=${Math.round(t || Date.now())}`;
+  const STEP_NAMES = { photoshop: 'Photoshop 算圖', textures: '縮成 1:1 貼圖', spine: '建立 Spine 專案', size: '確認尺寸', export: '打包輸出', verify: '驗證交付檔', preview: '產生預覽', showcase: '登記展示台' };
+  const STAGES = [
+    { key: 'split', name: '拆圖', steps: ['photoshop', 'textures'] },
+    { key: 'spine', name: 'Spine 動畫', steps: ['spine'] },
+    { key: 'size', name: '確認尺寸', steps: ['size'] },
+    { key: 'export', name: '輸出', steps: ['export'] },
+    { key: 'verify', name: '驗證', steps: ['verify', 'preview'] },
+    { key: 'showcase', name: '登記展示台', steps: ['showcase'] },
+  ];
+  const ALL_STEPS = STAGES.flatMap(s => s.steps);
+  let S = null, view = 'welcome', pinned = false, job = null, lastStarted = -1, queue = [], queueTotal = 0, skelSig = '';
+
+  // 嵌在煉丹爐裡（同源 iframe）時，展示台與收件批次改用外殼的；單獨開時用新分頁
+  const SHELL = (() => { try { return window.parent !== window && window.parent.Shell && window.parent.BatchStore ? window.parent : null; } catch { return null; } })();
+  // 網頁從哪裡來：本機（小幫手自己或本機煉丹爐）就用相對網址；線上（GitHub Pages）連這台電腦的小幫手
+  const HELPER_DEFAULT = 'http://localhost:8810/';
+  const API = new URLSearchParams(location.search).get('helper') || (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) ? '' : HELPER_DEFAULT);
+  const toast = (msg, err) => { const t = $('toast'); t.textContent = msg; t.className = 'toast on' + (err ? ' err' : ''); clearTimeout(t._h); t._h = setTimeout(() => t.className = 'toast', 4500); };
+
+  // ---------- 設定檔：匯入、選擇 ----------
+  async function loadConfigs(select) {
+    const list = await fetch(API + 'api/configs').then(r => r.json());
+    $('cfgSel').innerHTML = '<option value="">選擇設定檔…</option>' + list.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+    $('cfgSel').value = select && list.some(c => c.name === select) ? select : '';
+    return list;
+  }
+  async function uploadOne(file) {
+    if (!/\.json$/i.test(file.name)) throw new Error(`${file.name}：只接受 .json 設定檔`);
+    const r = await fetch(API + 'api/config', { method: 'POST', body: JSON.stringify({ filename: file.name, content: await file.text() }) }).then(r => r.json());
+    if (r.error) throw new Error(`${file.name}：${r.error}`);
+    return r.name;
+  }
+  async function importFiles(files) {
+    const names = [], errs = [];
+    for (const f of files) { try { names.push(await uploadOne(f)); } catch (e) { errs.push(e.message); } }
+    if (errs.length) { toast(errs.join('；'), true); const el = document.querySelector('.welcome .err'); if (el) el.textContent = errs.join('\n'); }
+    if (!names.length) return;
+    await loadConfigs(names[0]);
+    await select(names[0]);
+    const runNow = confirm(names.length > 1
+      ? `已匯入 ${names.length} 個設定檔：${names.join('、')}\n要依序執行全部流程嗎？`
+      : `已匯入「${names[0]}」。\n${S.config._說明 || ''}\n\n要開始執行全部流程嗎？`);
+    if (runNow) { queue = names.slice(1); queueTotal = names.length; start(ALL_STEPS); }
+  }
+  // 丟進來的檔案：PSD 走自動分析，JSON 走匯入設定檔
+  function handleFiles(files) {
+    if (job?.running) return toast('流程執行中，跑完再丟新的檔案', true);
+    const psds = files.filter(f => /\.ps[db]$/i.test(f.name)), jsons = files.filter(f => /\.json$/i.test(f.name));
+    const other = files.filter(f => !psds.includes(f) && !jsons.includes(f));
+    if (other.length) toast(`略過不支援的檔案：${other.map(f => f.name).join('、')}（請丟 .psd）`, true);
+    if (psds.length) { psdQueue = psds.slice(1); psdCreated = []; psdFlow(psds[0]); }
+    else if (jsons.length) importFiles(jsons);
+  }
+  $('importBtn').onclick = () => $('cfgFile').click();
+  $('cfgFile').onchange = e => { handleFiles([...e.target.files]); e.target.value = ''; };
+  $('cfgSel').onchange = () => $('cfgSel').value ? select($('cfgSel').value) : showWelcome();
+  let dragDepth = 0;
+  addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; $('dropall').classList.add('on'); });
+  addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; $('dropall').classList.remove('on'); } });
+  addEventListener('dragover', e => e.preventDefault());
+  addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('dropall').classList.remove('on'); if (e.dataTransfer.files.length) handleFiles([...e.dataTransfer.files]); });
+
+  // ---------- 丟 PSD：找原檔 → 分析 → 勾圖層、確認設定 → 開始 ----------
+  let psdQueue = [], psdCreated = [], templates = null;
+  function stageMsg(title, body) {
+    view = 'welcome'; S = null; destroyPlayer(); $('controls').classList.add('off'); $('prog').classList.remove('on');
+    $('chips').innerHTML = '<span class="chip gold">丟入 PSD</span>'; $('res').textContent = '';
+    $('frame').innerHTML = `<div class="welcome"><h2>${title}</h2>${body}</div>`;
+    renderFlow(); renderSide();
+  }
+  async function psdFlow(file) {
+    stageMsg('正在找 PSD 原檔…', `<span class="sub-in">「${esc(file.name)}」（${(file.size / 1048576).toFixed(1)} MB）：瀏覽器拿不到檔案位置，用檔名＋大小在工作根目錄（${esc(helper?.workRoot || '')}）底下找原檔，輸出會放在它所屬的專案資料夾。</span>`);
+    let hits = [];
+    try { hits = (await fetch(`${API}api/psd/locate?${new URLSearchParams({ name: file.name, size: file.size })}`).then(r => r.json())).hits || []; } catch {}
+    if (hits.length === 1) return analyze(hits[0]);
+    stageMsg(hits.length ? '找到多個同名同大小的 PSD' : '找不到 PSD 原檔', `
+      <span class="sub-in">${hits.length ? '請選要用哪一個：' : `在工作根目錄（${esc(helper?.workRoot || '')}）底下沒找到「${esc(file.name)}」。請貼上它的完整路徑（例如 ${esc(helper?.workRoot || 'D:')}/專案/01_設定/xxx.psd）：`}</span>
+      ${hits.map(h => `<div class="sub-in"><button data-hit="${esc(h)}">${esc(h)}</button></div>`).join('')}
+      <div class="sub-in" style="display:grid;grid-template-columns:1fr auto;gap:8px"><input type="text" id="psdPath" placeholder="PSD 完整路徑"><button class="gold" id="psdGo">分析這個 PSD</button></div>
+      <div class="err" id="psdErr"></div>`);
+    $('frame').querySelectorAll('[data-hit]').forEach(b => b.onclick = () => analyze(b.dataset.hit));
+    $('psdGo').onclick = () => analyze($('psdPath').value.trim().replace(/^"|"$/g, ''));
+  }
+  async function analyze(p) {
+    stageMsg('正在分析 PSD…', `<span class="sub-in mono">${esc(p)}</span><span class="sub-in">讀取頂層智慧型物件（每個當成一個圖騰候選）與縮圖。</span>`);
+    const [r, tp] = await Promise.all([fetch(`${API}api/psd/analyze?${new URLSearchParams({ path: p })}`).then(r => r.json()), templates || fetch(API + 'api/templates').then(r => r.json())]);
+    templates = tp;
+    if (r.error) return stageMsg('PSD 分析失敗', `<div class="err">${esc(r.error)}</div><div class="sub-in"><button id="back">回到開始</button></div>`), $('back').onclick = showWelcome;
+    renderSetup(r);
+  }
+  const OUT_PRESETS = [{ k: 'hd', t: '遊戲 1280 版面', scale: 0.667, size: [720, 1280], d: '設計稿 1920 → 1280（×0.667）' }, { k: 'fhd', t: 'FHD 1920', scale: 1, size: [1080, 1920], d: '設計稿原尺寸輸出（×1.0）' }, { k: 'custom', t: '自訂', scale: null, size: null, d: '' }];
+  function renderSetup(a) {
+    const d = a.defaults, cands = a.layers.filter(l => l.candidate), skipped = a.layers.filter(l => !l.candidate);
+    stageMsg('', '');
+    $('chips').innerHTML = `<span class="chip gold">確認設定</span><span class="chip">${esc(a.psd.split('/').pop())}</span>${psdQueue.length ? `<span class="chip">之後還有 ${psdQueue.length} 個 PSD</span>` : ''}`;
+    $('frame').innerHTML = `<div class="setup">
+      <div class="lyr"><h3>要做成圖騰的圖層 <small>${esc(a.psd)}・畫布 ${a.size.join('×')}</small></h3>
+        <span class="skipped">每個頂層智慧型物件是一個圖騰候選；圖片在拆圖時以 PSD 1:1 進 Spine，縮放只在 Spine 的 root 與打包。代號會用在骨架名稱（英數字）。</span>
+        <div class="lgrid">${cands.map((l, i) => {
+          const on = l.visible && l.occurrence === 1;
+          return `<div class="lcard ${on ? 'on' : ''}" data-i="${i}"><div class="th">${l.thumb ? `<img src="${fileUrl(l.thumb)}" alt="">` : ''}</div>
+            <label><input type="checkbox" class="use" ${on ? 'checked' : ''}>${esc(l.name)}${l.duplicates > 1 ? `<span class="tag">同名 ${l.duplicates} 個中的第 ${l.occurrence} 個</span>` : ''}${l.visible ? '' : '<span class="tag">隱藏</span>'}</label>
+            <input type="text" class="code" value="${esc(l.code)}" placeholder="代號（英數字）">
+            <span class="meta">${l.w}×${l.h} px・位置 ${l.bbox[0]},${l.bbox[1]}</span></div>`;
+        }).join('')}</div>
+        ${skipped.length ? `<span class="skipped">略過（不是智慧型物件）：${skipped.map(l => `${esc(l.name)}（${l.kind}）`).join('、')}</span>` : ''}
+      </div>
+      <div class="form"><h3>設定</h3>
+        ${d.existing.length ? `<div class="note" style="color:#f3c96a">這份 PSD 之前做過：${d.existing.map(n => `<a href="#" data-cfg="${esc(n)}" style="color:#f3c96a">${esc(n)}</a>`).join('、')}（點選直接用舊設定）</div>` : ''}
+        <label class="f"><span>專案名稱（英數字，用在骨架命名）</span><input type="text" id="fProject" value="${esc(d.project)}"></label>
+        <label class="f"><span>組名（同一份 PSD 可分多組，例如 Letter、High）</span><input type="text" id="fGroup" value="Main"></label>
+        <div class="f"><span>輸出規格（Spine root 與打包縮放）</span>${OUT_PRESETS.map((o, i) => `<label class="opt"><input type="radio" name="fOut" value="${o.k}" ${i === 0 ? 'checked' : ''}>${o.t}${o.d ? `<span class="note">　${o.d}</span>` : ''}</label>`).join('')}
+          <input type="number" id="fScale" step="0.001" min="0.05" max="4" value="0.667" disabled></div>
+        <label class="f"><span>動態樣板</span><select id="fTpl">${templates.map(t => `<option value="${esc(t.name)}" title="${esc(t.description)}">${esc(t.name)}</option>`).join('')}</select><span class="note" id="fTplNote"></span></label>
+        <label class="f"><span>動畫名稱</span><input type="text" id="fAnim" value="Bingo"></label>
+        <div class="f"><span>圖集</span><label class="opt"><input type="radio" name="fPack" value="all" checked>全部骨架共用一張</label><label class="opt"><input type="radio" name="fPack" value="perskeleton">每個骨架各一張</label></div>
+        <label class="opt"><input type="checkbox" id="fShow" ${d.showcase ? 'checked' : 'disabled'}>登記到煉丹爐展示台${d.showcase ? '' : '（找不到這個專案的展示台設定）'}</label>
+        <div class="f"><span>輸出到</span><span class="path" id="fOutPath"></span></div>
+        <div class="err" id="fErr"></div>
+        <div class="acts"><button class="gold" id="fGo"></button><button id="fSave">只建立設定，不執行</button><button id="fBack">取消</button></div>
+      </div></div>`;
+    const fr = $('frame');
+    const upd = () => {
+      const o = fr.querySelector('[name=fOut]:checked').value;
+      $('fScale').disabled = o !== 'custom';
+      if (o !== 'custom') $('fScale').value = OUT_PRESETS.find(p => p.k === o).scale;
+      $('fOutPath').textContent = `${d.root}/03_Spine/${$('fProject').value}_Symbol_${$('fGroup').value}/`;
+      $('fTplNote').textContent = templates.find(t => t.name === $('fTpl').value)?.description || '';
+      fr.querySelectorAll('.lcard').forEach(c => { c.classList.toggle('on', c.querySelector('.use').checked); c.querySelector('.code').classList.toggle('bad', c.querySelector('.use').checked && !/^[A-Za-z0-9_]+$/.test(c.querySelector('.code').value)); });
+      $('fProject').classList.toggle('bad', !/^[A-Za-z0-9]+$/.test($('fProject').value));
+      $('fGroup').classList.toggle('bad', !/^[A-Za-z0-9_]+$/.test($('fGroup').value));
+      const n = fr.querySelectorAll('.use:checked').length;
+      $('fGo').textContent = psdQueue.length ? `確定，設定下一個 PSD（還有 ${psdQueue.length} 個）` : psdCreated.length ? `確定，依序執行 ${psdCreated.length + 1} 個 PSD` : `開始執行（${n} 個圖騰）`;
+    };
+    fr.oninput = upd; fr.onchange = upd; upd();
+    fr.querySelectorAll('[data-cfg]').forEach(x => x.onclick = e => { e.preventDefault(); select(x.dataset.cfg); });
+    $('fBack').onclick = () => { psdQueue = []; psdCreated = []; showWelcome(); };
+    const submit = async run => {
+      const o = fr.querySelector('[name=fOut]:checked').value, preset = OUT_PRESETS.find(p => p.k === o);
+      const body = {
+        psd: a.psd, project: $('fProject').value.trim(), group: $('fGroup').value.trim(), scale: +$('fScale').value, size: preset.size,
+        template: $('fTpl').value, animName: $('fAnim').value.trim() || 'Bingo', packTarget: fr.querySelector('[name=fPack]:checked').value, showcase: $('fShow').checked,
+        symbols: [...fr.querySelectorAll('.lcard')].filter(c => c.querySelector('.use').checked).map(c => { const l = cands[+c.dataset.i]; return { layer: l.name, occurrence: l.occurrence, code: c.querySelector('.code').value.trim() }; }),
+      };
+      const r = await fetch(API + 'api/config/create', { method: 'POST', body: JSON.stringify(body) }).then(r => r.json());
+      if (r.error) { $('fErr').textContent = r.error; return; }
+      if (!run) { await loadConfigs(r.name); toast(`已建立設定檔 ${r.name}`); return select(r.name); }
+      psdCreated.push(r.name);
+      if (psdQueue.length) return psdFlow(psdQueue.shift());
+      const names = psdCreated; psdCreated = [];
+      await loadConfigs(names[0]); await select(names[0]);
+      queue = names.slice(1); queueTotal = names.length; start(ALL_STEPS);
+    };
+    $('fGo').onclick = () => submit(true); $('fSave').onclick = () => submit(false);
+  }
+
+  async function select(name) {
+    try { localStorage.setItem('symbol-anim-config', name); } catch {}
+    $('cfgSel').value = name;
+    lastStarted = -1;
+    await load();
+    show(view === 'welcome' ? firstUnfinished() : view);
+  }
+
+  // 尚未選設定檔：舞台顯示匯入指引
+  async function showWelcome() {
+    view = 'welcome'; S = null;
+    const list = await loadConfigs('');
+    try { localStorage.removeItem('symbol-anim-config'); } catch {}
+    $('chips').innerHTML = '<span class="chip gold">匯入設定檔</span>'; $('res').textContent = '';
+    $('controls').classList.add('off'); destroyPlayer();
+    $('frame').innerHTML = `<div class="welcome">
+      <h2>從圖騰 PSD 開始</h2>
+      <div class="stepsx">
+        <div><b>① 丟入 PSD</b>前端交付的圖騰 PSD（1:1 交付檔，每個圖騰是一個頂層智慧型物件）。一次丟多個會依序設定、依序執行。</div>
+        <div><b>② 確認圖層與設定</b>自動列出圖層縮圖，勾選要做的圖騰、確認代號；專案名稱、輸出規格、動態樣板都有預設值。</div>
+        <div><b>③ 開始執行</b>上方進度條與舞台左上角回報跑到哪；跑完在右側看結果、在下方播放 Spine。設定會存起來，下次可直接重跑。</div>
+      </div>
+      <div class="dropzone" id="dz"><span class="big">把 PSD 拖到這裡</span><span class="muted" style="color:#cfcac0">或</span><button class="gold" id="dzPick">選擇 PSD…</button></div>
+      <div class="exist">${list.length ? `之前做過的：${list.map(c => `<button data-cfg="${esc(c.name)}" title="${esc(c.note)}">${esc(c.name)}</button>`).join('')}` : '還沒有做過任何 PSD。'}</div>
+      <div class="sub-in">進階：也可以直接丟設定檔（.json），欄位說明在 _Skill/tools/symbol-anim/README.md。</div>
+      <div class="err"></div></div>`;
+    $('dzPick').onclick = () => $('cfgFile').click();
+    $('frame').querySelectorAll('[data-cfg]').forEach(b => b.onclick = () => select(b.dataset.cfg));
+    const dz = $('dz');
+    dz.ondragenter = () => dz.classList.add('over'); dz.ondragleave = () => dz.classList.remove('over');
+    renderFlow(); renderSide();
+  }
+
+  // ---------- 讀取狀態 ----------
+  async function load() {
+    const name = $('cfgSel').value; if (!name) return;
+    const q = new URLSearchParams({ config: name });
+    if ($('spineDir').value.trim()) q.set('spineDir', $('spineDir').value.trim());
+    const s = await fetch(API + 'api/state?' + q).then(r => r.json());
+    if (s.error) return toast(s.error, true);
+    S = s;
+    renderSide(); renderFlow();
+    const sig = S.exportFiles.map(f => f.path + f.mtime).join('|') + (S.report?.pass ?? '');
+    if (sig !== skelSig) { skelSig = sig; try { await buildPlayer(); } catch (e) { console.warn(e); destroyPlayer(); } }
+    if (view !== 'welcome') show(view);
+  }
+  $('reload').onclick = () => { skelSig = ''; load(); };
+  const firstUnfinished = () => (STAGES.find(st => stageStatus(st)[0] !== 'done') || STAGES[STAGES.length - 1]).key;
+
+  // ---------- 進度 ----------
+  // 只有最近一次執行的設定檔＝目前選的設定檔，才用執行狀態顯示進度
+  const jobCfg = () => job?.args ? job.args[2].split(/[\\/]/).pop().replace(/\.json$/i, '') : null;
+  const jobMine = () => !!S && jobCfg() === S.name;
+  const jobSteps = () => jobMine() ? job.args[job.args.indexOf('--steps') + 1].split(',') : [];
+  const started = () => [...(job?.log || '').matchAll(/^\[(\w+)\]/gm)].map(m => m[1]);
+  function lastProgress(step) {
+    let p = null;
+    for (const m of (job?.log || '').matchAll(/^@@(.+)$/gm)) { try { const o = JSON.parse(m[1]); if (o.step === step) p = o; } catch {} }
+    return p;
+  }
+  function stepFrac(step) {
+    const st = started(), steps = jobSteps();
+    if (!steps.includes(step)) return null;
+    if (!st.includes(step)) return 0;
+    const done = st.indexOf(step) < st.length - 1 || (!job.running && job.code === 0);
+    if (done) return 1;
+    const p = lastProgress(step);
+    return p && p.total ? p.done / p.total : 0;
+  }
+  function outputDone(step) {
+    if (!S) return false;
+    return {
+      photoshop: !!S.photoshopLog?.length && S.photoshopLog.every(l => !l.error), textures: !!S.textures, spine: !!S.spineMtime,
+      size: S.size?.pass, export: S.exportFiles.some(f => /\.skel$/i.test(f.path)), verify: S.report?.pass,
+      preview: S.previews.some(p => /\.mp4$/i.test(p)), showcase: S.showcase ? S.showcase.rows.every(r => r.ok) : null,
+    }[step];
+  }
+  function stageStatus(st) {
+    if (!S) return ['', '—', 0];
+    const steps = jobSteps();
+    if (jobMine() && st.steps.some(s => steps.includes(s)) && (job.running || job.code !== null)) {
+      const failed = (job.log.match(/^\[(\w+)\] 失敗/m) || [])[1];
+      if (failed && st.steps.includes(failed)) return ['fail', '失敗', 0];
+      if (st.key === 'showcase' && /略過登記展示台/.test(job.log)) return ['', '試跑：已略過', 1];
+      const fr = st.steps.map(stepFrac).filter(v => v !== null);
+      const f = fr.reduce((a, b) => a + b, 0) / fr.length;
+      if (f >= 1) return ['done', '完成', 1];
+      if (job.running && st.steps.some(s => started().slice(-1)[0] === s)) return ['run', `執行中 ${Math.round(f * 100)}%`, f];
+      if (job.running) return ['', '等待中', 0];
+      if (failed) return ['', '未執行（前一步失敗）', 0];
+    }
+    if (!S) return ['', '—', 0];
+    const d = st.steps.map(outputDone).filter(v => v !== null);
+    if (!d.length) return ['', '不登記', 0];
+    if (d.every(Boolean)) return ['done', st.key === 'size' || st.key === 'verify' ? '通過' : st.key === 'showcase' ? '已登記' : '有結果', 1];
+    if (st.key === 'size' && S.size && !S.size.pass) return ['fail', '尺寸不符', 0];
+    if (st.key === 'verify' && S.report && !S.report.pass) return ['fail', '未通過', 0];
+    return ['', st.key === 'showcase' ? '尚未登記' : '尚未執行', 0];
+  }
+  function renderFlow() {
+    $('flow').innerHTML = STAGES.map((st, i) => {
+      const [cls, txt, f] = stageStatus(st);
+      return `<div class="stage-step ${cls} ${view === st.key ? 'view' : ''}" data-k="${st.key}"><span class="dot">${cls === 'done' ? '✓' : cls === 'fail' ? '!' : i + 1}</span><b>${st.name}</b><small>${esc(txt)}</small><span class="bar"><i style="width:${Math.round(f * 100)}%"></i></span></div>`;
+    }).join('');
+  }
+  $('flow').onclick = e => { const s = e.target.closest('.stage-step'); if (!s || !S) return; pinned = !!job?.running && s.dataset.k !== curStage()?.key; show(s.dataset.k); };
+  const curStage = () => { const st = started(); return STAGES.find(s => s.steps.includes(st[st.length - 1])); };
+
+  function renderProgress() {
+    const on = jobMine() && (job.running || (job.code !== null && Date.now() - (job.ended || 0) < 6000));
+    $('prog').classList.toggle('on', !!on && view !== 'welcome');
+    if (!on) return;
+    const steps = jobSteps(), st = started(), cur = st[st.length - 1];
+    const fr = steps.map(s => stepFrac(s) ?? 0);
+    const all = fr.reduce((a, b) => a + b, 0) / steps.length;
+    const p = lastProgress(cur);
+    const stage = STAGES.find(s => s.steps.includes(cur));
+    const failed = /^\[\w+\] 失敗/m.test(job.log);
+    $('pStage').textContent = job.running ? (stage ? stage.name : '準備中') : failed ? '執行失敗' : '全部完成';
+    $('pStep').textContent = job.running ? (STEP_NAMES[cur] || '啟動中…') : `${Math.round((Date.now() - job.started) / 1000)} 秒`;
+    $('pItem').textContent = job.running && p ? `${p.label ? p.label + '・' : ''}${p.done} / ${p.total}` : '';
+    $('pSub').style.width = `${Math.round((job.running ? (p && p.total ? p.done / p.total : 0) : 1) * 100)}%`;
+    $('pPct').textContent = `${Math.round((job.running ? all : failed ? all : 1) * 100)}%`;
+    $('pAll').textContent = `${st.length} / ${steps.length} 步・${Math.round((Date.now() - job.started) / 1000)} 秒`;
+    $('pBar').style.width = `${Math.round((job.running || failed ? all : 1) * 100)}%`;
+    $('pQueue').hidden = queueTotal < 2;
+    $('pQueue').textContent = `設定檔 ${queueTotal - queue.length} / ${queueTotal}：${$('cfgSel').value}${queue.length ? `（接著：${queue.join('、')}）` : ''}`;
+  }
+
+  // ---------- 執行 ----------
+  async function start(steps, noConfirm) {
+    if (!S) return toast('先匯入或選擇設定檔', true);
+    const body = { config: $('cfgSel').value, steps, force: $('force').checked };
+    const dir = $('spineDir').value.trim();
+    if (dir) body.spineDir = dir;
+    if (!noConfirm && !dir && steps.some(s => ['spine', 'export', 'preview', 'showcase'].includes(s)) &&
+        !confirm(`會寫入正式資料夾（舊檔先備份到工作區）：\n${S.spineDir}${steps.includes('showcase') && S.config.showcase ? `\n並登記到展示台：${S.config.showcase.assets}` : ''}${queue.length ? `\n\n之後依序執行：${queue.join('、')}` : ''}\n\n確定執行？`)) { queue = []; queueTotal = 0; return; }
+    const r = await fetch(API + 'api/run', { method: 'POST', body: JSON.stringify(body) }).then(r => r.json());
+    if (r.error) return toast(r.error, true);
+    pinned = false; lastStarted = -1; $('tabs').querySelector('[data-t=log]').click();
+    poll();
+  }
+  $('runAll').onclick = () => { queue = []; queueTotal = 0; start(ALL_STEPS); };
+  $('runStage').onclick = () => { const st = STAGES.find(s => s.key === view); if (st) { queue = []; queueTotal = 0; start(st.steps); } };
+  $('runFrom').onclick = () => { const i = STAGES.findIndex(s => s.key === view); if (i >= 0) { queue = []; queueTotal = 0; start(STAGES.slice(i).flatMap(s => s.steps)); } };
+  $('spineDir').oninput = () => { $('runAll').textContent = $('spineDir').value.trim() ? '試跑執行' : '開始執行'; skelSig = ''; load(); };
+
+  async function poll() {
+    try { await pollOnce(); } catch (e) { console.warn(e); }
+    if (job?.running) setTimeout(poll, 600);
+  }
+  async function pollOnce() {
+    const wasRunning = job?.running;
+    job = await fetch(API + 'api/job').then(r => r.json());
+    if (wasRunning && !job.running) job.ended = Date.now();
+    renderLog();
+    ['runAll', 'runStage', 'runFrom', 'importBtn', 'cfgSel'].forEach(id => $(id).disabled = job.running);
+    const st = started();
+    if (st.length !== lastStarted) {
+      if (lastStarted !== -1 || !job.running) await load();  // 每完成一步重讀輸出
+      lastStarted = st.length;
+      const cur = curStage();
+      if (job.running && cur && !pinned) show(cur.key);
+    } else if (job.running && (view === 'split' || (['spine', 'size'].includes(view) && !app))) renderStage();  // 逐項出現；有播放器時不重畫以免打斷播放
+    renderFlow(); renderProgress();
+    $('jobState').innerHTML = job.running ? `<span class="badge none">執行中 ${Math.round((Date.now() - job.started) / 1000)} 秒</span>` : job.code === null ? '' : job.code === 0 ? '<span class="badge ok">完成</span>' : '<span class="badge bad">失敗</span>';
+    if (jobCfg() && $('cfgSel').value !== jobCfg() && job.running) await select(jobCfg());  // 別處啟動的工作：切到它的設定檔
+    if (!job.running && job.code !== null && wasRunning) {
+      // 跑完：有登記到展示台就停在登記頁（可直接按開啟），試跑或不登記停在驗證頁
+      await load();
+      const registered = job.code === 0 && jobSteps().includes('showcase') && !/略過登記展示台/.test(job.log) && S.showcase?.rows.every(r => r.ok);
+      show(job.code === 0 ? (registered ? 'showcase' : 'verify') : (curStage()?.key || view));
+      setTimeout(renderProgress, 6100);
+      if (job.code === 0 && queue.length) { const next = queue.shift(); await select(next); start(ALL_STEPS, true); }
+      else if (job.code !== 0 && queue.length) { toast(`「${$('cfgSel').value}」失敗，後面的 ${queue.length} 個設定檔沒有執行`, true); queue = []; }
+    }
+  }
+  function renderLog() {
+    const el = $('log'), atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+    const text = (job?.log || '（尚未執行）').replace(/^@@.*\r?\n/gm, '');
+    el.innerHTML = esc(text).replace(/^(\[\w+\])(.*)$/gm, (m, a, b) => /失敗/.test(b) ? `<span class="e">${a}${b}</span>` : `<span class="s">${a}</span>${b}`)
+      .replace(/(通過|符合|齊全|完成)\r?$/gm, '<span class="g">$1</span>').replace(/(不符合[^\n]*|缺檔|失敗[^\n]*)\r?$/gm, '<span class="e">$1</span>');
+    if (atBottom) el.scrollTop = el.scrollHeight;
+  }
+
+  // ---------- 分頁（舞台內容） ----------
+  function show(k) {
+    if (!S) return;
+    view = k;
+    const st = STAGES.find(s => s.key === k);
+    $('chips').innerHTML = `<span class="chip gold">${st.name}</span><span class="chip">${esc(S.name)}</span>${$('spineDir').value.trim() ? '<span class="chip">試跑</span>' : ''}`;
+    $('res').textContent = `${(S.config.output.size || []).join('×')} 版面・輸出 ${S.config.output.scale}`;
+    renderStage(); renderFlow(); renderProgress();
+    $('footNote').textContent = job?.running ? (pinned ? '已固定此頁；點目前執行中的階段恢復自動跟隨。' : '自動跟隨執行中的階段。') : `目前看：${st.name}。寫入正式資料夾前會先備份舊檔。`;
+  }
+  function renderStage() {
+    const fr = $('frame');
+    const usePlayer = ['spine', 'size', 'verify'].includes(view) && app;
+    $('controls').classList.toggle('off', !usePlayer);
+    if (usePlayer) {
+      if (!fr.contains(app.view)) { fr.innerHTML = '<div class="canvaswrap" id="cw"></div>'; $('cw').append(app.view); }
+      $('alpha').value = view === 'size' ? 50 : 100; applyAlpha();
+      if (view === 'size') { playing = false; setTime(0); } else if (!userPaused) playing = true;
+      $('play').textContent = playing ? '❚❚' : '▶';
+      fitPlayer(); return;
+    }
+    if (view === 'split') return renderSplit(fr);
+    if (view === 'export') return renderAtlas(fr);
+    if (view === 'showcase') return renderShowcaseStage(fr);
+    if (view === 'spine') return renderSkeletons(fr);
+    if (view === 'size') return renderRenders(fr);
+    fr.innerHTML = `<div class="empty-stage"><b>${STAGES.find(s => s.key === view).name}</b><span>尚未輸出 Spine，這一段跑完後會在這裡播放。</span></div>`;
+  }
+
+  // 還沒輸出 skel 時：Spine 動畫頁列出建好的骨架
+  function renderSkeletons(fr) {
+    const t = S.template, fps = S.config.animation.fps || 30, sec = t ? (t.keys.slice(-1)[0][0] / fps).toFixed(2) : '?';
+    const built = !!S.spineMtime && !(job?.running && started().slice(-1)[0] === 'spine');
+    const p = job?.running ? lastProgress('spine') : null;
+    fr.innerHTML = `<div class="tiles">${S.config.symbols.map((sym, idx) => {
+      const tx = S.textures?.[sym.code], done = built || (p && idx < p.done), cur = p && idx === p.done;
+      return `<div class="tile ${cur ? 'cur' : done ? 'ok' : ''}"><div class="hd"><b>${esc(sym.code)}</b><span>${cur ? '匯入中…' : done ? '已建立' : '等待'}</span></div>
+        <div class="pair" style="grid-template-columns:minmax(0,1fr)">${tx ? `<img src="${bust(fileUrl(`${S.spineDir}/Images/${tx.skeleton}/${tx.image}.png`), S.spineMtime || 1)}" alt="" style="width:${tx.size[0]}px;justify-self:center">` : '<div class="ph">貼圖</div>'}</div>
+        <div class="facts">${esc(tx?.skeleton || '')}<br>root ${+(S.config.output.scale / (S.config.textureScale || 1)).toFixed(4)} → Actor → ${esc(S.config.naming.bone || 'Main')}・${esc(S.config.animation.name)} ${sec} 秒</div></div>`;
+    }).join('')}</div>`;
+  }
+
+  // 還沒輸出 skel 時：確認尺寸頁顯示 Spine 算出的第 0 格與尺寸比對
+  function renderRenders(fr) {
+    const rows = S.size?.rows || [], running = job?.running && started().slice(-1)[0] === 'size';
+    fr.innerHTML = `<div class="tiles">${S.config.symbols.map(sym => {
+      const tx = S.textures?.[sym.code], r = rows.find(z => z.skeleton === tx?.skeleton), rd = tx && S.renders?.[tx.skeleton];
+      const ok = r && Object.values(r.pass).every(Boolean);
+      return `<div class="tile ${r ? (ok ? 'ok' : 'cur') : ''}"><div class="hd"><b>${esc(sym.code)}</b><span>${r ? (ok ? '<span style="color:#7fd6a4">符合</span>' : '<span style="color:#ff9a8b">不符</span>') : running ? '算圖中…' : '等待'}</span></div>
+        <div class="pair" style="grid-template-columns:minmax(0,1fr);background:#3a0f12;border-radius:6px">${rd && !running ? `<img src="${bust(fileUrl(rd.path), rd.mtime)}" alt="" style="justify-self:center;image-rendering:pixelated" title="Spine 算圖第 0 格（遊戲像素 1:1）">` : '<div class="ph">Spine 算圖</div>'}</div>
+        <div class="facts">${r ? `第 0 格 ${r.frame0.join('×')}・預期 ${r.expected.join('×')}・root ${r.root}・${r.duration} 秒` : tx ? `預期 ${tx.psdBox.map(v => (v * S.config.output.scale).toFixed(1)).join('×')}` : '&nbsp;'}</div></div>`;
+    }).join('')}</div>`;
+  }
+
+  function renderSplit(fr) {
+    const run = job?.running;
+    const pPS = run ? lastProgress('photoshop') : null, pTx = run ? lastProgress('textures') : null;
+    const st = started(), cur = st[st.length - 1];
+    fr.innerHTML = `<div class="tiles">${S.config.symbols.map((sym, idx) => {
+      const t = S.textures?.[sym.code];
+      const psDone = run && jobSteps().includes('photoshop') ? (st.includes('photoshop') && (cur !== 'photoshop' || (pPS && idx < pPS.done))) : !!S.photoshopLog;
+      const txDone = run && jobSteps().includes('textures') ? (st.includes('textures') && (cur !== 'textures' || (pTx && idx < pTx.done))) : !!t;
+      const isCur = run && ((cur === 'photoshop' && pPS && idx === pPS.done) || (cur === 'textures' && pTx && idx === pTx.done));
+      const ps = `${S.work}/photoshop/${sym.code}/full.png`, tex = t && `${S.spineDir}/Images/${t.skeleton}/${t.image}.png`;
+      return `<div class="tile ${isCur ? 'cur' : txDone ? 'ok' : ''}"><div class="hd"><b>${esc(sym.code)}</b><span>${isCur ? '處理中…' : txDone ? '完成' : psDone ? '已算圖' : '等待'}</span></div>
+        <div class="pair">${psDone ? `<img src="${bust(fileUrl(ps), S.spineMtime || 1)}" alt="">` : '<div class="ph">合成圖</div>'}<span style="color:#9a958c">→</span>
+        ${txDone && t ? `<img src="${bust(fileUrl(tex), S.spineMtime || 1)}" alt="" style="width:${t.size[0]}px" title="設計稿 1:1">` : '<div class="ph">1:1 貼圖</div>'}</div>
+        <div class="facts">${t ? `PSD ${t.psdBox.join('×')}・貼圖 ${t.size.join('×')}・遊戲 ${t.psdBox.map(v => (v * S.config.output.scale).toFixed(0)).join('×')}` : '&nbsp;'}</div></div>`;
+    }).join('')}</div>`;
+  }
+
+  function renderAtlas(fr) {
+    if (!S.atlas.length) { fr.innerHTML = '<div class="empty-stage"><b>輸出</b><span>尚未輸出圖集。</span></div>'; return; }
+    const a = S.atlas[0], pages = []; let page = null, reg = null;
+    for (const l of a.text.split(/\r?\n/)) {
+      let m;
+      if (/\.(png|jpg)$/i.test(l.trim())) { page = { name: l.trim(), regs: [] }; pages.push(page); reg = null; continue; }
+      if (!page) continue;
+      if ((m = l.match(/^size:\s*(\d+),\s*(\d+)/))) { page.size = [+m[1], +m[2]]; continue; }
+      if (l && !l.startsWith(' ') && !l.includes(':')) { reg = { name: l.trim() }; page.regs.push(reg); continue; }
+      if (reg && (m = l.match(/rotate:\s*(\w+)/))) reg.rot = m[1] === 'true';
+      if (reg && (m = l.match(/xy:\s*(\d+),\s*(\d+)/))) reg.xy = [+m[1], +m[2]];
+      if (reg && (m = l.match(/^\s+size:\s*(\d+),\s*(\d+)/))) reg.size = [+m[1], +m[2]];
+    }
+    const p = pages[0], dir = a.path.replace(/[\\/][^\\/]+$/, '');
+    const z = Math.max(1, Math.min((fr.clientWidth - 40) / p.size[0], (fr.clientHeight - 40) / p.size[1]));
+    fr.innerHTML = `<div style="display:grid;gap:8px;justify-items:center"><div class="atlasbox" style="width:${p.size[0] * z}px;height:${p.size[1] * z}px"><img src="${bust(fileUrl(dir + '/' + p.name), S.exportFiles[0]?.mtime)}" alt="">
+      ${p.regs.map(r => { const [w, h] = r.rot ? [r.size[1], r.size[0]] : r.size; return `<div class="r" style="left:${r.xy[0] * z}px;top:${r.xy[1] * z}px;width:${w * z}px;height:${h * z}px"><span>${esc(r.name)} ${r.size.join('×')}${r.rot ? ' ↻' : ''}</span></div>`; }).join('')}</div>
+      <span style="font-size:12px;color:#cfcac0">${esc(p.name)}・${p.size.join('×')}・${p.regs.length} 個區域（放大 ${z.toFixed(1)}× 顯示；區域尺寸＝遊戲像素，↻＝旋轉擺放）</span></div>`;
+  }
+
+  function renderShowcaseStage(fr) {
+    const sc = S.showcase;
+    if (!sc) { fr.innerHTML = '<div class="empty-stage"><b>登記展示台</b><span>這個設定檔沒有 showcase 欄位，不登記。</span></div>'; return; }
+    const ok = sc.rows.every(r => r.ok);
+    fr.innerHTML = `<div class="card-on-stage"><h3>${ok ? '✓ 已登記到展示台' : '尚未登記到展示台'}</h3>
+      <span style="color:#cfcac0">「登記展示台」會把每個圖騰代號對到這次輸出的 skel＋共用 atlas，寫進煉丹爐展示台的設定 <span class="mono">${esc(sc.assets)}</span>；展示台開啟時讀這份設定、依 spineSize（${esc((sc.spineSize || []).join('×') || '未設定')}）換算成遊戲像素 1:1 播放中獎動畫。之後重新輸出 Spine，展示台重新整理就是新版。</span>
+      <table><thead><tr><th>代號</th><th>skel</th><th>中獎動畫</th><th>狀態</th></tr></thead><tbody>
+      ${sc.rows.map(r => `<tr><td><b>${esc(r.code)}</b></td><td class="mono">${esc(r.skel || '—')}</td><td>${esc(r.win || '—')}</td><td>${r.ok ? '<span class="y">已登記</span>' : r.skel ? '<span class="x">指向其他檔案</span>' : '未登記'}</td></tr>`).join('')}
+      </tbody></table>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">${ok ? `<button class="gold" id="openShowcase2" style="font-size:15px;padding:9px 20px">開啟展示台 ↗</button><span style="color:#b9b3a8;font-size:12px">在新分頁開這個專案的展示台；煉丹爐本機伺服器沒開會先幫你啟動。</span>`
+        : `<span style="color:#cfcac0">正式執行（不填試跑資料夾）跑完「登記展示台」後，這裡會出現開啟按鈕。</span>`}</div></div>`;
+    if (ok) $('openShowcase2').onclick = openShowcase;
+  }
+
+  // 開啟展示台：先開空白分頁（避免被擋），確認伺服器開著再導過去
+  const showcaseProject = () => (S?.showcase?.assets || '').match(/projects\/([^/]+)\/assets\.json$/)?.[1];
+  async function openShowcase() {
+    const id = showcaseProject();
+    if (!id) return toast('這個設定檔沒有登記展示台', true);
+    if (SHELL) {  // 外殼的展示台已開過就重新整理，讀到剛登記的 assets.json
+      const f = SHELL.Shell.frames.showcase;
+      if (f) f.src = f.src;
+      return SHELL.Shell.open('showcase');
+    }
+    const w = window.open('about:blank', '_blank');
+    let st = await fetch(API + 'api/showcase/status').then(r => r.json()).catch(() => ({ up: false }));
+    if (!st.up) {
+      if (!confirm('煉丹爐本機伺服器（展示台）沒有開著，要幫你啟動嗎？')) { w?.close(); return; }
+      toast('啟動展示台伺服器中…');
+      st = await fetch(API + 'api/showcase/start', { method: 'POST' }).then(r => r.json()).catch(() => ({ up: false }));
+      if (!st.up) { w?.close(); return toast('展示台伺服器啟動失敗，請手動執行 _Workbench/serve.js', true); }
+    }
+    const url = `http://localhost:${st.port}/showcase/index.html?project=${encodeURIComponent(id)}`;
+    if (w) w.location = url; else window.open(url, '_blank');
+  }
+  $('openShowcase').onclick = openShowcase;
+
+  // 接回煉丹爐流程：輸出的 Spine 建成收件批次，外殼接著開「資源檢查」
+  async function toBatch() {
+    const q = new URLSearchParams({ config: $('cfgSel').value });
+    if ($('spineDir').value.trim()) q.set('spineDir', $('spineDir').value.trim());
+    if (!SHELL) {  // 單獨開：到本機煉丹爐打開這個工具，在那裡送批次
+      const w = window.open('about:blank', '_blank');
+      let st = await fetch(API + 'api/showcase/status').then(r => r.json()).catch(() => ({ up: false }));
+      if (!st.up) st = await fetch(API + 'api/showcase/start', { method: 'POST' }).then(r => r.json()).catch(() => ({ up: false }));
+      if (!st.up) { w?.close(); return toast('煉丹爐本機伺服器啟動失敗，請手動執行 _Workbench/serve.js', true); }
+      const url = `http://localhost:${st.port}/#symbol-anim`;
+      if (w) w.location = url; else window.open(url, '_blank');
+      return toast('已在煉丹爐開啟這個工具，選同一個設定檔後按「送進收件批次」');
+    }
+    $('toBatch').disabled = true;
+    try {
+      const b = await fetch(API + 'api/bundle?' + q).then(r => r.json());
+      if (!b.files?.length) throw new Error('Export 沒有檔案，先跑到「輸出」');
+      toast(`讀取 ${b.files.length} 個檔案…`);
+      const files = await Promise.all(b.files.map(async f => ({ path: f.path, blob: await fetch(fileUrl(f.abs)).then(r => { if (!r.ok) throw new Error('讀不到 ' + f.path); return r.blob(); }) })));
+      SHELL.postMessage({ type: 'symbol-anim-batch', name: b.name, files }, location.origin);
+    } catch (e) { toast('送批次失敗：' + e.message, true); }
+    finally { $('toBatch').disabled = false; }
+  }
+  $('toBatch').onclick = toBatch;
+
+  // ---------- 右側資訊 ----------
+  $('tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('.tabpane').forEach(p => p.classList.toggle('on', p.dataset.t === b.dataset.t)); };
+  const yn = v => v ? '<span class="y">✓</span>' : '<span class="x">✗</span>';
+  function renderSide() {
+    $('openShowcase').hidden = !(S?.showcase?.rows?.length && S.showcase.rows.every(r => r.ok));
+    $('toBatch').hidden = !S?.exportFiles?.some(f => /\.skel$/i.test(f.path));
+    $('toBatch').textContent = SHELL ? '送進收件批次 →' : '到煉丹爐接續驗證 ↗';
+    if (!S) { $('paneResult').innerHTML = '<div class="box"><h4>尚未選擇設定檔</h4><span class="muted">從上方「匯入設定檔」或舞台上的匯入區開始。</span></div>'; $('paneFiles').innerHTML = ''; $('cfgKv').innerHTML = ''; $('curve').innerHTML = ''; return; }
+    const rows = S.report?.rows || S.size?.rows || [];
+    const n = S.config.symbols.length, pass = rows.filter(r => Object.values(r.pass).every(Boolean)).length;
+    $('paneResult').innerHTML = `<div class="stats">
+        <div class="stat"><b>${rows.length ? pass : '—'} / ${n}</b><span>圖騰通過${S.report ? '（驗證）' : S.size ? '（確認尺寸）' : ''}</span></div>
+        <div class="stat"><b>${S.config.output.scale}</b><span>輸出縮放・${(S.config.output.size || []).join('×')}</span></div>
+        <div class="stat"><b>${S.atlas.length ? S.atlas.length : '—'}</b><span>圖集（${S.config.export?.packTarget === 'perskeleton' ? '各自一張' : '全部共用'}）</span></div>
+        <div class="stat"><b>${S.config.animation.name}</b><span>${S.template ? (S.template.keys.slice(-1)[0][0] / (S.config.animation.fps || 30)).toFixed(2) + ' 秒・' : ''}${S.config.animation.template}</span></div></div>
+      <div class="box"><h4>各圖騰尺寸 <small>容差 ±${S.config.verify?.tolerance ?? 2} px</small></h4><table class="mini"><thead><tr><th>圖騰</th><th>預期</th><th>第 0 格</th><th>圖集</th><th>root</th><th>秒</th></tr></thead><tbody>
+        ${S.config.symbols.map(sym => { const t = S.textures?.[sym.code], r = rows.find(x => x.skeleton === t?.skeleton);
+          return `<tr><td><b>${esc(sym.code)}</b></td><td class="n">${t ? t.psdBox.map(v => (v * S.config.output.scale).toFixed(1)).join('×') : '—'}</td><td class="n">${r ? r.frame0.join('×') + ' ' + yn(r.pass.frame0) : '—'}</td><td class="n">${r?.atlas ? r.atlas.join('×') + ' ' + yn(r.pass.atlas) : '—'}</td><td class="n">${r ? r.root + ' ' + yn(r.pass.root) : '—'}</td><td class="n">${r ? r.duration + ' ' + yn(r.pass.duration) : '—'}</td></tr>`; }).join('')}
+      </tbody></table></div>
+      ${(() => { const lay = S.previews.filter(p => /版面尺寸對照/.test(p))[0]; return lay ? `<div class="box"><h4>版面尺寸對照 <small>設定稿 vs Spine 第 0 格</small></h4><img src="${bust(fileUrl(lay), S.size ? Date.now() : 1)}" alt="" style="max-width:100%;border-radius:6px"></div>` : ''; })()}`;
+    const vids = S.previews.filter(p => /\.mp4$/i.test(p));
+    $('paneFiles').innerHTML = `<div class="box"><h4>Export <small>${S.exportFiles.length} 個檔案</small></h4><table class="mini"><tbody>${S.exportFiles.map(f => `<tr><td class="mono">${esc(f.path.split(/[\\/]/).pop())}</td><td class="n">${(f.size / 1024).toFixed(1)} KB</td></tr>`).join('') || '<tr><td class="muted">尚未輸出</td></tr>'}</tbody></table></div>
+      <div class="box"><h4>預覽影片</h4>${vids.map(p => `<video src="${bust(fileUrl(p), 1)}" controls loop muted playsinline style="width:100%;border-radius:6px;background:#111"></video>`).join('') || '<span class="muted">尚無</span>'}</div>
+      <div class="box"><h4>位置</h4><dl class="kv"><dt>Spine 專案</dt><dd>${esc(S.spineFile)}</dd><dt>工作區</dt><dd>${esc(S.work)}</dd></dl></div>`;
+    const c = S.config, o = c.output;
+    $('cfgName').textContent = S.name;
+    $('cfgKv').innerHTML = [['說明', c._說明 || '—'], ['PSD', S.psd], ['圖騰', c.symbols.map(s => s.code).join('、')], ['命名', `${c.naming.skeleton}／${c.naming.image}／骨頭 ${c.naming.bone || 'Main'}`],
+      ['輸出', `${o.scale}・${(o.size || []).join('×')}・root／打包 ${+(o.scale / (c.textureScale || 1)).toFixed(6)}`], ['動畫', `${c.animation.name}・${c.animation.template}・${c.animation.fps || 30} fps`],
+      ['打包', c.export?.packTarget === 'perskeleton' ? '每個骨架各一張圖集' : '全部共用一張圖集'], ['展示台', c.showcase ? c.showcase.assets : '不登記']]
+      .map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('');
+    drawCurve();
+  }
+  let curveMap = null;
+  function drawCurve() {
+    const t = S?.template; if (!t) { $('curve').innerHTML = ''; return; }
+    const fps = S.config.animation.fps || t.fps || 30, last = t.keys[t.keys.length - 1][0];
+    const vals = t.keys.map(k => k[1]), lo = Math.min(0.9, ...vals), hi = Math.max(1.1, ...vals);
+    const W = 360, H = 150, L = 32, R = 6, T = 8, B = 20, x = f => L + (W - L - R) * f / last, y = v => T + (H - T - B) * (hi - v) / (hi - lo);
+    const bez = (c, u) => { let a = 0, b = 1, s = u; for (let i = 0; i < 20; i++) { s = (a + b) / 2; const bx = 3 * (1 - s) ** 2 * s * c[0] + 3 * (1 - s) * s * s * c[2] + s ** 3; if (bx < u) a = s; else b = s; } return 3 * (1 - s) ** 2 * s * c[1] + 3 * (1 - s) * s * s * c[3] + s ** 3; };
+    const pts = [];
+    for (let i = 0; i < t.keys.length - 1; i++) { const [f0, v0, cv] = t.keys[i], [f1, v1] = t.keys[i + 1], c = typeof cv === 'string' ? t.curves[cv] : cv; for (let n = 0; n <= 16; n++) { const u = n / 16; pts.push([f0 + (f1 - f0) * u, v0 + (v1 - v0) * (c ? bez(c, u) : u)]); } }
+    let s = `<line x1="${L}" x2="${W - R}" y1="${y(1)}" y2="${y(1)}" stroke="#d6d0c4" stroke-dasharray="3 3"/>`;
+    for (const v of [lo, 1, hi]) s += `<text x="${L - 4}" y="${y(v) + 3}" text-anchor="end" font-size="9" fill="#847c70">${v.toFixed(2)}</text>`;
+    for (let f = 0; f <= last; f += 10) s += `<text x="${x(f)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="#847c70">${f}</text>`;
+    s += `<polyline fill="none" stroke="#c8901a" stroke-width="1.8" points="${pts.map(([f, v]) => `${x(f).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}"/>` + t.keys.map(([f, v]) => `<circle cx="${x(f)}" cy="${y(v)}" r="2.6" fill="#c8901a"><title>第 ${f} 格：${v}</title></circle>`).join('');
+    s += `<line id="playhead" x1="${x(0)}" x2="${x(0)}" y1="${T}" y2="${H - B}" stroke="#2f9a63" stroke-width="1.4"/>`;
+    $('curve').innerHTML = s; curveMap = { L, R, W, last, fps };
+    $('curveTitle').textContent = `${S.config.animation.template}・${last} 格`;
+  }
+
+  // ---------- Spine 播放器 ----------
+  let app = null, views = [], playing = true, userPaused = false, duration = 2, tt = 0;
+  function destroyPlayer() { if (app) { app.destroy(true, { children: true }); app = null; } views = []; }
+  async function buildPlayer() {
+    destroyPlayer();
+    const skels = S.exportFiles.filter(f => /\.skel$/i.test(f.path)), atlas = S.atlas[0];
+    if (!skels.length || !atlas) return;
+    const k = S.config.output.scale, cells = S.config.verify?.layout?.cells || {}, codes = S.config.symbols.map(s => s.code);
+    const boxes = codes.map(c => cells[c] ? [Math.round((cells[c][2] - cells[c][0]) * k), Math.round((cells[c][3] - cells[c][1]) * k)] : [160, 160]);
+    const GAP = 6, LABEL = 16, W = boxes.reduce((n, b) => n + b[0] + GAP, GAP), H = Math.max(...boxes.map(b => b[1])) + GAP * 2 + LABEL;
+    const a = new PIXI.Application({ width: W, height: H, backgroundColor: 0x1b1b1d, antialias: true });
+    const refTex = S.reference ? await PIXI.Assets.load(bust(fileUrl(S.reference), 1)).catch(() => null) : null;
+    const anim = S.config.animation.name, rows = S.report?.rows || S.size?.rows || [];
+    let x = GAP;
+    for (let i = 0; i < codes.length; i++) {
+      const code = codes[i], [bw, bh] = boxes[i], t = S.textures?.[code], r = rows.find(z => z.skeleton === t?.skeleton);
+      const skel = skels.find(f => f.path.replace(/\\/g, '/').endsWith('/' + (t?.skeleton || '#') + '.skel'));
+      const ok = r && Object.values(r.pass).every(Boolean);
+      const label = new PIXI.Text(`${code}${r ? (ok ? '  ✓ ' : '  ✗ ') + r.frame0.join('×') : ''}`, { fontFamily: 'Microsoft JhengHei', fontSize: 12, fill: r ? (ok ? 0x7fd6a4 : 0xff9a8b) : 0xb9b3a8 });
+      label.position.set(x, 1); a.stage.addChild(label);
+      const cell = new PIXI.Container(); cell.position.set(x, GAP + LABEL); a.stage.addChild(cell);
+      cell.addChild(new PIXI.Graphics().beginFill(0x3a0f12).drawRect(0, 0, bw, bh).endFill());
+      let ref = null;
+      if (refTex && cells[code]) { const [x0, y0, x1, y1] = cells[code]; ref = new PIXI.Sprite(new PIXI.Texture(refTex.baseTexture, new PIXI.Rectangle(x0, y0, x1 - x0, y1 - y0))); ref.width = bw; ref.height = bh; cell.addChild(ref); }
+      if (skel) {
+        const data = (await PIXI.Assets.load({ src: bust(fileUrl(skel.path), skel.mtime), data: { spineAtlasFile: bust(fileUrl(atlas.path), skel.mtime) } })).spineData;
+        const sp = new PIXI.spine.Spine(data);
+        sp.autoUpdate = false; sp.position.set(bw / 2, bh / 2);  // 原點對格子中心，scale 1＝遊戲像素 1:1
+        sp.state.setAnimation(0, anim, true); cell.addChild(sp);
+        duration = data.findAnimation(anim)?.duration || duration;
+        views.push({ sp, ref });
+      }
+      x += bw + GAP;
+    }
+    app = a;
+    $('scrub').max = Math.round(duration * (S.config.animation.fps || 30));
+    applyAlpha(); applyRef();
+    app.ticker.add(() => { if (playing) { tt = (tt + app.ticker.deltaMS / 1000 * +$('speed').value) % duration; setTime(tt); } });
+    setTime(0);
+    if (['spine', 'size', 'verify'].includes(view)) renderStage();
+  }
+  function fitPlayer() {
+    if (!app) return;
+    const fr = $('frame'), z = $('actual').checked ? 1 : Math.max(0.5, Math.min((fr.clientWidth - 8) / app.view.width, (fr.clientHeight - 8) / app.view.height));
+    app.view.style.width = Math.floor(app.view.width * z) + 'px'; app.view.style.height = Math.floor(app.view.height * z) + 'px';
+    $('res').textContent = `${(S.config.output.size || []).join('×')} 版面・Spine 1:1${$('actual').checked ? '' : `・顯示 ${z.toFixed(2)}×`}`;
+  }
+  addEventListener('resize', () => { fitPlayer(); if (view === 'export' && S) renderStage(); });
+  function setTime(t) {
+    if (!S) return;
+    tt = t;
+    const fps = S.config.animation.fps || 30;
+    for (const v of views) { const tr = v.sp.state.tracks[0]; if (tr) tr.trackTime = t; v.sp.update(0); }
+    $('scrub').value = Math.round(t * fps);
+    $('frameVal').textContent = `第 ${Math.round(t * fps)} / ${Math.round(duration * fps)} 格・${t.toFixed(2)} 秒`;
+    const ph = document.getElementById('playhead');
+    if (curveMap && ph) { const px = curveMap.L + (curveMap.W - curveMap.L - curveMap.R) * Math.min(t * curveMap.fps / curveMap.last, 1); ph.setAttribute('x1', px); ph.setAttribute('x2', px); }
+  }
+  const applyAlpha = () => { const a = +$('alpha').value / 100; views.forEach(v => v.sp.alpha = a); $('alphaVal').textContent = `${$('alpha').value}%`; };
+  const applyRef = () => views.forEach(v => v.ref && (v.ref.visible = $('showRef').checked));
+  $('play').onclick = () => { playing = !playing; userPaused = !playing; $('play').textContent = playing ? '❚❚' : '▶'; };
+  $('scrub').oninput = () => { playing = false; userPaused = true; $('play').textContent = '▶'; setTime(+$('scrub').value / (S.config.animation.fps || 30)); };
+  $('alpha').oninput = applyAlpha; $('showRef').onchange = applyRef; $('actual').onchange = fitPlayer;
+
+  // ---------- 啟動 ----------
+  // ---------- 本機小幫手 ----------
+  let helper = null;
+  const checksHtml = h => `<div class="checks">${h.checks.map(c => `<div class="${c.ok ? 'y' : 'n'}"><i>${c.ok ? '✓' : '✗'}</i><span>${esc(c.name)}${c.ok ? '' : `<small>　${esc(c.hint)}</small>`}</span></div>`).join('')}</div>`;
+  async function connectHelper() {
+    try {
+      const ctl = new AbortController(); setTimeout(() => ctl.abort(), 2500);
+      helper = await fetch(API + 'api/helper', { signal: ctl.signal, cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(r.status === 403 ? '小幫手拒絕這個網址（不在 allowOrigins）' : 'HTTP ' + r.status); return r.json(); });
+    } catch (e) { helper = { error: e.name === 'AbortError' ? '逾時' : e.message }; }
+    const chip = $('helperChip'), bad = helper.checks?.filter(c => !c.ok) || [];
+    chip.className = 'helper ' + (helper.error ? 'bad' : bad.length ? 'warn' : 'ok');
+    chip.textContent = helper.error ? '本機小幫手：未連線' : bad.length ? `本機小幫手：缺 ${bad.length} 項` : `本機小幫手 ✓ v${helper.version}`;
+    return !helper.error;
+  }
+  function showOffline() {
+    view = 'offline'; S = null;
+    $('controls').classList.add('off'); destroyPlayer();
+    $('chips').innerHTML = '<span class="chip">未連線</span>'; $('res').textContent = '';
+    const online = API !== '';
+    $('frame').innerHTML = `<div class="welcome offline">
+      <h2>連不到這台電腦的本機小幫手</h2>
+      <div class="stepsx">
+        <div><b>這個工具怎麼運作</b>網頁只是操作介面；拆圖、做 Spine、輸出都由你電腦上的「本機小幫手」呼叫 Photoshop 與 Spine 完成。檔案不會上傳到網路。</div>
+        <div><b>需要</b>Windows、<b>Photoshop</b>（拆圖時會自動開啟）、Spine 3.8.99、Node.js，以及工具資料夾裡的 Python 環境（.venv）。</div>
+        <div><b>啟動小幫手</b>雙擊工具資料夾裡的 <code>啟動簡易圖騰動畫產生器.cmd</code>（只啟動小幫手可執行 <code>node web/server.js 8810</code>）。開好後這頁會自動連上。</div>
+      </div>
+      ${online ? `<div class="sub-in">Chrome／Edge 第一次連線會詢問「允許這個網站存取區域網路上的裝置」，請按允許。小幫手只接受 helper.json 裡 allowOrigins 列出的網址。</div>` : ''}
+      <div class="sub-in">目前連線位址：<code>${esc(API || location.origin + '/')}</code>　狀態：${esc(helper?.error || '')}</div>
+      <div><button class="gold" id="retryHelper">重新連線</button></div></div>`;
+    $('retryHelper').onclick = () => boot();
+    renderFlow(); renderSide();
+  }
+  $('helperChip').onclick = async () => {
+    if (!await connectHelper()) return showOffline();
+    const bad = helper.checks.filter(c => !c.ok);
+    toast(bad.length ? `缺：${bad.map(c => c.name).join('、')}` : `本機小幫手 v${helper.version}，環境都齊全（工作根目錄 ${helper.workRoot}）`, !!bad.length);
+  };
+  let retryTimer = null;
+  async function boot() {
+    clearTimeout(retryTimer);
+    if (!await connectHelper()) { showOffline(); retryTimer = setTimeout(() => view === 'offline' && boot(), 4000); return; }
+    const bad = helper.checks.filter(c => !c.ok);
+    if (bad.length) toast(`本機環境缺：${bad.map(c => c.name).join('、')}（按右上角小幫手看細節）`, true);
+    await start();
+  }
+
+  async function start() {
+    let last = null; try { last = localStorage.getItem('symbol-anim-config'); } catch {}
+    const list = await loadConfigs(last);
+    job = await fetch(API + 'api/job').then(r => r.json());
+    if (last && list.some(c => c.name === last)) { await select(last); } else await showWelcome();
+    renderLog(); renderFlow();
+    if (job.running) poll();
+  }
+  boot();
+})();
+</script>
+</body>
+</html>
