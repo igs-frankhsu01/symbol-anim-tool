@@ -295,7 +295,6 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
   const SHELL = (() => { try { return window.parent !== window && window.parent.Shell && window.parent.BatchStore ? window.parent : null; } catch { return null; } })();
   // 網頁從哪裡來：本機（小幫手自己或本機煉丹爐）就用相對網址；線上（GitHub Pages）連這台電腦的小幫手
   const HELPER_DEFAULT = 'http://localhost:8810/';
-  const ONLINE_WORKBENCH = 'https://claude.ai/artifact/7L6na6VaNMe2LVoDLJ4CKo';  // 線上煉丹爐
   const API = new URLSearchParams(location.search).get('helper') || (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) ? '' : HELPER_DEFAULT);
   const toast = (msg, err) => { const t = $('toast'); t.textContent = msg; t.className = 'toast on' + (err ? ' err' : ''); clearTimeout(t._h); t._h = setTimeout(() => t.className = 'toast', 4500); };
 
@@ -754,7 +753,8 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
     const q = new URLSearchParams({ config: $('cfgSel').value });
     if ($('spineDir').value.trim()) q.set('spineDir', $('spineDir').value.trim());
     if (!SHELL && !helper?.checks?.find(c => c.id === 'workbench')?.ok) {  // 沒有本機煉丹爐：到線上煉丹爐的收件區拖資料夾
-      window.open(ONLINE_WORKBENCH, '_blank');
+      if (!helper.deploy?.workbenchUrl) return toast(`把 ${S.spineDir} 整個資料夾拖到線上煉丹爐首頁「收件驗證」的收件區`);
+      window.open(helper.deploy.workbenchUrl, '_blank');  // 線上煉丹爐（deploy.json）
       return toast(`已開啟線上煉丹爐：把 ${S.spineDir} 整個資料夾拖到首頁「收件驗證」的收件區`);
     }
     if (!SHELL) {  // 單獨開：到本機煉丹爐打開這個工具，在那裡送批次
@@ -915,7 +915,7 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
       <h2>連不到這台電腦的本機小幫手</h2>
       <div class="sub-in" style="color:#cfcac0">網頁只是操作介面；拆圖、做 Spine、輸出都由你電腦上的「本機小幫手」呼叫 Photoshop 與 Spine 完成，檔案不會上傳。需要 Windows、<b>Photoshop</b>、Spine 3.8.99。</div>
       <div class="stepsx">
-        <div><b>① 第一次用：下載小幫手</b>解壓到固定位置（例如 D:/Tools），不要在下載區直接執行。<br><a class="gold btnlink" href="${online ? '' : 'https://igs-frankhsu01.github.io/symbol-anim-tool/'}download/symbol-anim-helper.zip" download>下載 symbol-anim-helper.zip ↓</a></div>
+        <div><b>① 第一次用：下載小幫手</b>解壓到固定位置（例如 D:/Tools），不要在下載區直接執行。<br><a class="gold btnlink" href="download/symbol-anim-helper.zip" download>下載 symbol-anim-helper.zip ↓</a></div>
         <div><b>② 雙擊 install.cmd</b>自動檢查 Photoshop、Spine；沒有 Node.js、Python 會開下載頁。完成後桌面會有「簡易圖騰動畫小幫手」捷徑。</div>
         <div><b>③ 已經裝過：雙擊桌面捷徑</b>啟動小幫手，這頁會自動連上（每 4 秒重試一次）。</div>
       </div>
