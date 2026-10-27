@@ -911,7 +911,7 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
         <div><b>需要</b>Windows、<b>Photoshop</b>（拆圖時會自動開啟）、Spine 3.8.99、Node.js，以及工具資料夾裡的 Python 環境（.venv）。</div>
         <div><b>啟動小幫手</b>雙擊工具資料夾裡的 <code>啟動簡易圖騰動畫產生器.cmd</code>（只啟動小幫手可執行 <code>node web/server.js 8810</code>）。開好後這頁會自動連上。</div>
       </div>
-      ${online ? `<div class="sub-in">Chrome／Edge 第一次連線會詢問「允許這個網站存取區域網路上的裝置」，請按允許。小幫手只接受 helper.json 裡 allowOrigins 列出的網址。</div>` : ''}
+      ${online ? `<div class="sub-in">Chrome／Edge 第一次連線會詢問「允許這個網站存取區域網路上的裝置」，請按允許。之前按過封鎖或沒看到詢問：點網址列左邊的圖示 →「網站設定」→「區域網路存取」改成允許，再按重新連線。小幫手只接受 helper.json 裡 allowOrigins 列出的網址。</div>` : ''}
       <div class="sub-in">目前連線位址：<code>${esc(API || location.origin + '/')}</code>　狀態：${esc(helper?.error || '')}</div>
       <div><button class="gold" id="retryHelper">重新連線</button></div></div>`;
     $('retryHelper').onclick = () => boot();
