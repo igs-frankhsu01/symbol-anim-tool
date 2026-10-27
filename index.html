@@ -928,10 +928,10 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
     if (!await connectHelper()) { showOffline(); retryTimer = setTimeout(() => view === 'offline' && boot(), 4000); return; }
     const bad = helper.checks.filter(c => !c.ok);
     if (bad.length) toast(`本機環境缺：${bad.map(c => c.name).join('、')}（按右上角小幫手看細節）`, true);
-    await start();
+    await startApp();
   }
 
-  async function start() {
+  async function startApp() {
     let last = null; try { last = localStorage.getItem('symbol-anim-config'); } catch {}
     const list = await loadConfigs(last);
     job = await fetch(API + 'api/job').then(r => r.json());
