@@ -395,8 +395,10 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
         <label class="f"><span>動態樣板</span><select id="fTpl">${templates.map(t => `<option value="${esc(t.name)}" title="${esc(t.description)}">${esc(t.name)}</option>`).join('')}</select><span class="note" id="fTplNote"></span></label>
         <label class="f"><span>動畫名稱</span><input type="text" id="fAnim" value="Bingo"></label>
         <div class="f"><span>圖集</span><label class="opt"><input type="radio" name="fPack" value="all" checked>全部骨架共用一張</label><label class="opt"><input type="radio" name="fPack" value="perskeleton">每個骨架各一張</label></div>
-        <label class="opt"><input type="checkbox" id="fShow" ${d.showcase ? 'checked' : 'disabled'}>登記到煉丹爐展示台${d.showcase ? '' : '（找不到這個專案的展示台設定）'}</label>
-        <div class="f"><span>輸出到</span><span class="path" id="fOutPath"></span></div>
+        <div class="f"><span>存放位置（Spine 專案資料夾會建在這裡面）</span>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:6px"><input type="text" id="fOutParent" value="${esc(d.root)}/03_Spine"><button type="button" id="fPick">選擇…</button></div>
+          <span class="note">輸出到 <span class="path" id="fOutPath"></span></span></div>
+        <label class="opt"><input type="checkbox" id="fShow" ${d.showcase ? 'checked' : 'disabled'}>登記到煉丹爐展示台${d.showcase ? '' : d.workbench ? `（本機煉丹爐的展示台沒有「${esc(d.root.split('/').pop())}」這個專案）` : '（這台電腦沒有本機煉丹爐；做好後把 Spine 資料夾拖進線上煉丹爐的收件區）'}</label>
         <div class="err" id="fErr"></div>
         <div class="acts"><button class="gold" id="fGo"></button><button id="fSave">只建立設定，不執行</button><button id="fBack">取消</button></div>
       </div></div>`;
@@ -405,7 +407,7 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
       const o = fr.querySelector('[name=fOut]:checked').value;
       $('fScale').disabled = o !== 'custom';
       if (o !== 'custom') $('fScale').value = OUT_PRESETS.find(p => p.k === o).scale;
-      $('fOutPath').textContent = `${d.root}/03_Spine/${$('fProject').value}_Symbol_${$('fGroup').value}/`;
+      $('fOutPath').textContent = `${$('fOutParent').value.trim().replace(/\\/g, '/').replace(/\/+$/, '')}/${$('fProject').value}_Symbol_${$('fGroup').value}/`;
       $('fTplNote').textContent = templates.find(t => t.name === $('fTpl').value)?.description || '';
       fr.querySelectorAll('.lcard').forEach(c => { c.classList.toggle('on', c.querySelector('.use').checked); c.querySelector('.code').classList.toggle('bad', c.querySelector('.use').checked && !/^[A-Za-z0-9_]+$/.test(c.querySelector('.code').value)); });
       $('fProject').classList.toggle('bad', !/^[A-Za-z0-9]+$/.test($('fProject').value));
@@ -416,11 +418,17 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
     fr.oninput = upd; fr.onchange = upd; upd();
     fr.querySelectorAll('[data-cfg]').forEach(x => x.onclick = e => { e.preventDefault(); select(x.dataset.cfg); });
     $('fBack').onclick = () => { psdQueue = []; psdCreated = []; showWelcome(); };
+    $('fPick').onclick = async () => {
+      $('fPick').disabled = true; $('fPick').textContent = '請看 Windows 視窗…';
+      const r = await fetch(`${API}api/pick-folder?${new URLSearchParams({ start: $('fOutParent').value.trim() })}`, { method: 'POST' }).then(r => r.json()).catch(() => ({}));
+      $('fPick').disabled = false; $('fPick').textContent = '選擇…';
+      if (r.path) { $('fOutParent').value = r.path; upd(); }
+    };
     const submit = async run => {
       const o = fr.querySelector('[name=fOut]:checked').value, preset = OUT_PRESETS.find(p => p.k === o);
       const body = {
         psd: a.psd, project: $('fProject').value.trim(), group: $('fGroup').value.trim(), scale: +$('fScale').value, size: preset.size,
-        template: $('fTpl').value, animName: $('fAnim').value.trim() || 'Bingo', packTarget: fr.querySelector('[name=fPack]:checked').value, showcase: $('fShow').checked,
+        template: $('fTpl').value, animName: $('fAnim').value.trim() || 'Bingo', packTarget: fr.querySelector('[name=fPack]:checked').value, showcase: $('fShow').checked, outParent: $('fOutParent').value.trim().replace(/^"|"$/g, ''),
         symbols: [...fr.querySelectorAll('.lcard')].filter(c => c.querySelector('.use').checked).map(c => { const l = cands[+c.dataset.i]; return { layer: l.name, occurrence: l.occurrence, code: c.querySelector('.code').value.trim() }; }),
       };
       const r = await fetch(API + 'api/config/create', { method: 'POST', body: JSON.stringify(body) }).then(r => r.json());
