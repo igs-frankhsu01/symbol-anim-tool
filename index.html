@@ -129,6 +129,16 @@ button:disabled { opacity: .45; cursor: default; }
 .form .acts { display: grid; gap: 8px; margin-top: 4px; }
 .skipped { font-size: 11.5px; color: #9a958c; }
 .pgrid { display: grid; gap: 5px; }
+.tgal { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.tcard { display: grid; gap: 2px; padding: 4px 4px 6px; border: 1px solid var(--line); border-radius: 8px; background: rgba(0,0,0,.18); text-align: center; font-size: 11.5px; line-height: 1.25; cursor: pointer; }
+.tcard canvas { width: 100%; height: 64px; display: block; border-radius: 5px; background: #2a1414; }
+.tcard small { color: #6f8fb0; font-size: 10.5px; }
+.tcard.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.pvbox { display: grid; gap: 4px; }
+.pvbox canvas { width: 100%; height: 170px; display: block; border-radius: 6px; background: repeating-conic-gradient(#3a1a1a 0 25%, #331616 0 50%) 0 0 / 16px 16px; }
+.pvbar { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 6px; align-items: center; font-size: 11.5px; }
+.pvbar button { padding: 2px 0; }
+.pvbar input { width: 100%; accent-color: #c8901a; }
 .pgrid .pr { display: grid; grid-template-columns: 74px minmax(0, 1fr) 70px; gap: 6px; align-items: center; font-size: 12px; }
 .pgrid .pr input[type=number] { width: 100%; padding: 3px 4px; }
 .pgrid .pr input[type=range] { width: 100%; accent-color: #c8901a; }
@@ -295,7 +305,7 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
       <div class="pbody">
         <div class="empty" id="tuneEmpty">選擇設定檔後可在這裡調整動態。新建設定時，樣板與參數在「確認設定」裡調。</div>
         <div class="box curve" id="curveBox"><h4>目前動態 <small id="curveTitle"></small></h4><svg id="curve" viewBox="0 0 360 150"></svg><div class="legend" id="curveLegend"></div></div>
-        <div class="box form" id="animBox"><h4>樣板與參數 <small>下方為調整後預覽</small></h4><select id="aTpl"></select><span class="note" id="aTplNote"></span><div id="aParams"></div></div>
+        <div class="box form" id="animBox"><h4>樣板與參數 <small>預覽用 <select id="aSym" style="font-size:12px;padding:1px 4px"></select></small></h4><select id="aTpl"></select><span class="note" id="aTplNote"></span><div id="aParams"></div></div>
       </div>
       <div class="foot" id="tuneFoot">
         <div class="err" id="aErr"></div>
@@ -453,7 +463,11 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
       $('fGo').textContent = psdQueue.length ? `確定，設定下一個 PSD（還有 ${psdQueue.length} 個）` : psdCreated.length ? `確定，依序執行 ${psdCreated.length + 1} 個 PSD` : `開始執行（${n} 個圖騰）`;
     };
     fr.oninput = upd; fr.onchange = upd; upd();
-    const fParams = paramEditor($('fParams'), () => $('fTpl').value);
+    const fSrc = () => fr.querySelector('.lcard .use:checked')?.closest('.lcard').querySelector('img')?.src;
+    const fParams = paramEditor($('fParams'), () => $('fTpl').value, null, fSrc);
+    const fGal = templateGallery($('fTpl'), fSrc);
+    let fLast = fSrc();
+    fr.addEventListener('change', () => { const s2 = fSrc(); if (s2 !== fLast) { fLast = s2; fParams.setSrc(s2); fGal.setSrc(s2 || demoImg()); } });
     $('fTpl').addEventListener('change', () => fParams.reset());
     fr.querySelectorAll('[data-cfg]').forEach(x => x.onclick = e => { e.preventDefault(); select(x.dataset.cfg); });
     $('fBack').onclick = () => { psdQueue = []; psdCreated = []; showWelcome(); };
@@ -911,18 +925,145 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
     return { svg: s, legend, x, L, R };
   }
 
+  // ---------- 即時預覽：照樣板在網頁上算縮放與偽 3D 透視（跟 run.py tilt_project 同一套），不用跑 Spine ----------
+  const imgCache = {};
+  const loadImg = src => imgCache[src] || (imgCache[src] = new Promise(ok => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; }));
+  let demoSrc = null;
+  function demoImg() {  // 還沒有圖騰時用的示範圖
+    if (demoSrc) return demoSrc;
+    const c = document.createElement('canvas'); c.width = c.height = 160; const g = c.getContext('2d');
+    const gr = g.createRadialGradient(64, 56, 10, 80, 80, 78); gr.addColorStop(0, '#ffe7a0'); gr.addColorStop(1, '#c8901a');
+    g.fillStyle = gr; g.beginPath(); g.arc(80, 80, 76, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#7a1414'; g.font = 'bold 96px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('A', 80, 86);
+    return demoSrc = c.toDataURL();
+  }
+  function sampleTrack(keys, curves, f, vi) {
+    if (!keys?.length) return 0;
+    if (f >= keys[keys.length - 1][0]) return keys[keys.length - 1][vi];
+    for (let i = 0; i < keys.length - 1; i++) {
+      const a = keys[i], b = keys[i + 1];
+      if (f >= a[0] && f < b[0]) { const cv = a[a.length - 1], c = typeof cv === 'string' ? curves[cv] : cv, u = (f - a[0]) / (b[0] - a[0]); return a[vi] + (b[vi] - a[vi]) * (c ? bez(c, u) : u); }
+    }
+    return keys[0][vi];
+  }
+  // 網格頂點（y 向上、中心 0,0）→ 先繞 Y 再繞 X，透視距離 dist；回傳投影點與朝光亮度比
+  function projectGrid(w, h, gx, gy, ry, rx, dist) {
+    const a = ry * Math.PI / 180, b = rx * Math.PI / 180, pts = [];
+    for (let j = 0; j <= gy; j++) for (let i = 0; i <= gx; i++) {
+      const X = -w / 2 + w * i / gx, Y = h / 2 - h * j / gy;
+      const x = X * Math.cos(a), z0 = X * Math.sin(a), y = Y * Math.cos(b) - z0 * Math.sin(b), z = Y * Math.sin(b) + z0 * Math.cos(b), s = dist / (dist - z);
+      pts.push([x * s, y * s]);
+    }
+    const n = [-Math.sin(a), -Math.sin(b) * Math.cos(a), Math.cos(b) * Math.cos(a)];
+    return { pts, lit: n[0] * -0.35 + n[1] * 0.45 + n[2] };
+  }
+  // 把來源三角形（貼圖像素）仿射對應到目標三角形；目標稍微外擴，避免三角形之間露縫
+  function drawTri(g, im, s0, s1, s2, d0, d1, d2) {
+    const cx = (d0[0] + d1[0] + d2[0]) / 3, cy = (d0[1] + d1[1] + d2[1]) / 3, ex = p => { const dx = p[0] - cx, dy = p[1] - cy, l = Math.hypot(dx, dy) || 1; return [p[0] + dx / l * 0.7, p[1] + dy / l * 0.7]; };
+    const [e0, e1, e2] = [ex(d0), ex(d1), ex(d2)];
+    g.save(); g.beginPath(); g.moveTo(e0[0], e0[1]); g.lineTo(e1[0], e1[1]); g.lineTo(e2[0], e2[1]); g.closePath(); g.clip();
+    const den = s0[0] * (s1[1] - s2[1]) + s1[0] * (s2[1] - s0[1]) + s2[0] * (s0[1] - s1[1]);
+    if (Math.abs(den) > 1e-6) {
+      const m = (k) => [
+        (d0[k] * (s1[1] - s2[1]) + d1[k] * (s2[1] - s0[1]) + d2[k] * (s0[1] - s1[1])) / den,
+        (d0[k] * (s2[0] - s1[0]) + d1[k] * (s0[0] - s2[0]) + d2[k] * (s1[0] - s0[0])) / den,
+        (d0[k] * (s1[0] * s2[1] - s2[0] * s1[1]) + d1[k] * (s2[0] * s0[1] - s0[0] * s2[1]) + d2[k] * (s0[0] * s1[1] - s1[0] * s0[1])) / den];
+      const X = m(0), Y = m(1);
+      g.setTransform(X[0], Y[0], X[1], Y[1], X[2], Y[2]);
+      g.drawImage(im, 0, 0);
+    }
+    g.restore();
+  }
+  const off = document.createElement('canvas');
+  // 畫第 f 格：縮放（骨頭等比）＋偽 3D 網格＋轉向暗面
+  function drawPose(cv, t, im, f) {
+    const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+    if (!W || !H) return;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    const g = cv.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height);
+    if (!t || !im) return;
+    const w = im.naturalWidth, h = im.naturalHeight, tl = t.tilt;
+    const maxS = Math.max(1, ...t.keys.map(k => k[1])), fit = Math.min(W, H) * 0.8 / (Math.max(w, h) * maxS * (tl ? 1.15 : 1)) * dpr;
+    const sc = sampleTrack(t.keys, t.curves, f, 1) * fit;
+    off.width = cv.width; off.height = cv.height;
+    const o = off.getContext('2d'); o.setTransform(1, 0, 0, 1, 0, 0); o.clearRect(0, 0, off.width, off.height);
+    const cx = cv.width / 2, cy = cv.height / 2;
+    let lit = 1;
+    if (tl) {
+      const [gx, gy] = tl.grid || [8, 8], ry = sampleTrack(tl.keys, t.curves, f, 1), rx = sampleTrack(tl.keys, t.curves, f, 2);
+      const p = projectGrid(w, h, gx, gy, ry, rx, (tl.perspective ?? 2.2) * Math.max(w, h)); lit = p.lit;
+      const scr = ([x, y]) => [cx + x * sc, cy - y * sc], at = (i, j) => scr(p.pts[j * (gx + 1) + i]), src = (i, j) => [w * i / gx, h * j / gy];
+      for (let j = 0; j < gy; j++) for (let i = 0; i < gx; i++) {
+        drawTri(o, im, src(i, j), src(i + 1, j), src(i + 1, j + 1), at(i, j), at(i + 1, j), at(i + 1, j + 1));
+        drawTri(o, im, src(i, j), src(i + 1, j + 1), src(i, j + 1), at(i, j), at(i + 1, j + 1), at(i, j + 1));
+      }
+      const dark = Math.max(0, (tl.shade || 0) * (1 - lit));
+      if (dark > 0.002) { o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-atop'; o.fillStyle = `rgba(0,0,0,${Math.min(1, dark)})`; o.fillRect(0, 0, off.width, off.height); o.globalCompositeOperation = 'source-over'; }
+    } else {
+      o.drawImage(im, cx - w * sc / 2, cy - h * sc / 2, w * sc, h * sc);
+    }
+    g.drawImage(off, 0, 0);
+  }
+  // 所有預覽共用一個 rAF：畫面上看不到的自動移除
+  const previews = new Set();
+  let pvClock = performance.now();
+  function addPreview(p) { previews.add(p); if (previews.size === 1) requestAnimationFrame(pvLoop); return p; }
+  function pvLoop(now) {
+    const dt = (now - pvClock) / 1000; pvClock = now;
+    for (const p of previews) {
+      if (!p.cv.isConnected) { previews.delete(p); continue; }
+      const t = p.getT(), im = p.img;
+      if (!t || t.error) { drawPose(p.cv, null); continue; }
+      const len = Math.max(1, t.length || t.keys[t.keys.length - 1][0]), fps = t.fps || 30;
+      if (p.playing) p.f = (p.f + dt * fps) % len;
+      drawPose(p.cv, t, im, p.f);
+      p.onFrame?.(p.f, len);
+    }
+    if (previews.size) requestAnimationFrame(pvLoop);
+  }
+  function makePreview(cv, getT, src, onFrame) {
+    const p = { cv, getT, img: null, f: 0, playing: true, onFrame };
+    p.setImg = s => loadImg(s).then(im => { p.img = im; });
+    p.setImg(src || demoImg());
+    return addPreview(p);
+  }
+  // 預設參數的樣板（給縮圖卡用）
+  const tplDefault = {};
+  const getTplDefault = name => tplDefault[name] || (tplDefault[name] = fetch(`${API}api/template?${new URLSearchParams({ name, params: '{}' })}`).then(r => r.json()).catch(() => null));
+  // 樣板縮圖卡：取代下拉選單的外觀（select 保留存值），每張都在播預設參數的動畫
+  function templateGallery(sel, getSrc) {
+    let g = sel.nextElementSibling?.classList.contains('tgal') ? sel.nextElementSibling : null;
+    if (!g) { g = document.createElement('div'); g.className = 'tgal'; sel.after(g); }
+    sel.style.display = 'none';
+    g.innerHTML = templates.map(t => `<button type="button" class="tcard ${t.name === sel.value ? 'on' : ''}" data-n="${esc(t.name)}" title="${esc(t.description)}"><canvas></canvas><b>${esc(t.title || t.name)}</b>${t.tilt ? '<small>偽 3D</small>' : ''}</button>`).join('');
+    const cards = [...g.querySelectorAll('.tcard')], pvs = [];
+    cards.forEach(c => {
+      const name = c.dataset.n; let tt = null;
+      getTplDefault(name).then(t => tt = t);
+      pvs.push(makePreview(c.querySelector('canvas'), () => tt, getSrc()));
+      c.onclick = () => { sel.value = name; cards.forEach(x => x.classList.toggle('on', x === c)); sel.dispatchEvent(new Event('change', { bubbles: true })); };
+    });
+    return { setSrc: s => pvs.forEach(p => p.setImg(s)) };
+  }
+
   // 樣板參數編輯：每個參數一列（滑桿＋數字），變動時向小幫手要展開後的樣板畫曲線
-  function paramEditor(box, getName, initial) {
-    let vals = { ...(initial || {}) }, timer = null;
+  function paramEditor(box, getName, initial, getSrc) {
+    let vals = { ...(initial || {}) }, timer = null, cur = null, pv = null;
     const meta = () => templates?.find(t => t.name === getName());
     const values = () => Object.fromEntries((meta()?.params || []).map(p => [p.key, vals[p.key] ?? p.default]));
     function render() {
       const ps = meta()?.params || [];
-      box.innerHTML = `${ps.length ? `<div class="pgrid">${ps.map(p => { const v = vals[p.key] ?? p.default; return `<label class="pr" title="${esc(p.note || '')}"><span class="lb">${esc(p.label)}</span>
+      box.innerHTML = `<div class="pvbox"><canvas class="pv" title="即時預覽：網頁直接算的樣板動畫，跟 Spine 輸出同一套算法"></canvas>
+          <div class="pvbar"><button type="button" class="pvplay" title="播放／暫停">❚❚</button><input type="range" class="pvscrub" min="0" max="60" step="1" value="0"><span class="pvf mono">0 格</span></div></div>
+        ${ps.length ? `<div class="pgrid">${ps.map(p => { const v = vals[p.key] ?? p.default; return `<label class="pr" title="${esc(p.note || '')}"><span class="lb">${esc(p.label)}</span>
           <input type="range" data-r="${p.key}" min="${p.min}" max="${p.max}" step="${p.step}" value="${v}"><span style="display:flex;align-items:center;gap:2px"><input type="number" data-p="${p.key}" min="${p.min}" max="${p.max}" step="${p.step}" value="${v}"><small>${esc(p.unit || '')}</small></span></label>`; }).join('')}</div>` : '<span class="note">這個樣板沒有可調參數</span>'}
         <svg class="pchart" viewBox="0 0 340 120"></svg><div class="legend"></div><span class="note pinfo"></span>`;
       box.querySelectorAll('[data-r]').forEach(r => r.oninput = e => { e.stopPropagation(); box.querySelector(`[data-p="${r.dataset.r}"]`).value = r.value; vals[r.dataset.r] = +r.value; redraw(); });
       box.querySelectorAll('[data-p]').forEach(n => n.oninput = e => { e.stopPropagation(); if (n.value === '' || !Number.isFinite(+n.value)) return; box.querySelector(`[data-r="${n.dataset.p}"]`).value = n.value; vals[n.dataset.p] = +n.value; redraw(); });
+      const play = box.querySelector('.pvplay'), scrub = box.querySelector('.pvscrub'), lab = box.querySelector('.pvf');
+      pv = makePreview(box.querySelector('.pv'), () => cur, getSrc?.(), (f, len) => { scrub.max = len; if (pv.playing) scrub.value = Math.floor(f); lab.textContent = `${Math.floor(f)} / ${len} 格`; });
+      play.onclick = () => { pv.playing = !pv.playing; play.textContent = pv.playing ? '❚❚' : '▶'; };
+      scrub.oninput = e => { e.stopPropagation(); pv.playing = false; play.textContent = '▶'; pv.f = +scrub.value; };
       redraw(true);
     }
     function redraw(now) {
@@ -931,6 +1072,7 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
         const t = await fetch(`${API}api/template?${new URLSearchParams({ name: getName(), params: JSON.stringify(values()) })}`).then(r => r.json()).catch(() => null);
         const svg = box.querySelector('.pchart'), info = box.querySelector('.pinfo');
         if (!svg || !t) return;
+        cur = t;
         if (t.error) { svg.innerHTML = ''; info.textContent = t.error; info.style.color = '#ff9a8b'; return; }
         const r = animChart(t, 340, 120);
         svg.innerHTML = r.svg; box.querySelector('.legend').innerHTML = r.legend;
@@ -938,7 +1080,7 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
       }, now ? 0 : 120);
     }
     render();
-    return { values, reset(v) { vals = { ...(v || {}) }; render(); } };
+    return { values, reset(v) { vals = { ...(v || {}) }; render(); }, setSrc: s => pv?.setImg(s || demoImg()) };
   }
 
   // 設定分頁：改目前設定檔的樣板與參數，套用後從 Spine 動畫重跑
@@ -955,9 +1097,14 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
     $('aTpl').innerHTML = templates.map(t => `<option value="${esc(t.name)}" ${t.name === a.template ? 'selected' : ''}>${esc(t.title || t.name)}${t.tilt ? '（偽 3D）' : ''}</option>`).join('');
     const note = () => $('aTplNote').textContent = templates.find(t => t.name === $('aTpl').value)?.description || '';
     note(); $('aErr').textContent = '';
-    aEditor = paramEditor($('aParams'), () => $('aTpl').value, a.params);
+    const tx = S.textures || {}, codes = S.config.symbols.map(x => x.code).filter(c => tx[c]);
+    $('aSym').innerHTML = codes.map(c => `<option>${esc(c)}</option>`).join('') || '<option value="">示範圖</option>';
+    const aSrc = () => { const t = tx[$('aSym').value]; return t ? bust(fileUrl(`${S.spineDir}/Images/${t.skeleton}/${t.image}.png`), S.spineMtime || 1) : null; };
+    aEditor = paramEditor($('aParams'), () => $('aTpl').value, a.params, aSrc);
+    const aGal = templateGallery($('aTpl'), aSrc);
+    $('aSym').onchange = () => { aEditor.setSrc(aSrc()); aGal.setSrc(aSrc() || demoImg()); };
     $('aTpl').onchange = () => { note(); aEditor.reset($('aTpl').value === a.template ? a.params : {}); };
-    $('aReset').onclick = () => { $('aTpl').value = a.template; note(); aEditor.reset(a.params); };
+    $('aReset').onclick = () => { $('aTpl').value = a.template; note(); aEditor.reset(a.params); $('aTpl').nextElementSibling.querySelectorAll('.tcard').forEach(c => c.classList.toggle('on', c.dataset.n === a.template)); };
   }
   $('aApply').onclick = async () => {
     if (!S || job?.running) return;
@@ -1076,7 +1223,7 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
 
   // ---------- 啟動 ----------
   // ---------- 本機小幫手 ----------
-  const UI_VERSION = '0.3.0';  // 跟 web/server.js 的 VERSION 一致（build_site.js 會檢查）
+  const UI_VERSION = '0.4.0';  // 跟 web/server.js 的 VERSION 一致（build_site.js 會檢查）
   $('uiVer').textContent = 'v' + UI_VERSION;
   let helper = null;
   const checksHtml = h => `<div class="checks">${h.checks.map(c => `<div class="${c.ok ? 'y' : 'n'}"><i>${c.ok ? '✓' : '✗'}</i><span>${esc(c.name)}${c.ok ? '' : `<small>　${esc(c.hint)}</small>`}</span></div>`).join('')}</div>`;
