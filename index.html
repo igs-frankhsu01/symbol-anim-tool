@@ -68,7 +68,25 @@ button:disabled { opacity: .45; cursor: default; }
 /* 主區 */
 .main { display: grid; grid-template-columns: 340px minmax(0, 1fr) 360px; min-height: 0; }
 @media (max-width: 1400px) { .main { grid-template-columns: 300px minmax(0, 1fr) 320px; } }
-.center { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; }
+.center { display: grid; grid-template-rows: minmax(0, 1fr) auto auto; min-height: 0; }
+.tl { border-top: 1px solid var(--line); background: var(--panel); font-size: 12px; }
+.tlhead { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; color: var(--muted); }
+.tlhead b { color: var(--text); font-size: 13px; }
+.tlhead button { padding: 3px 9px; font-size: 12px; }
+.tlhead input { font: inherit; font-size: 12px; padding: 2px 5px; border: 1px solid var(--line2); border-radius: 6px; }
+.tlhead input[type=number] { width: 58px; }
+.tlhead input[type=text] { width: 170px; }
+.tlhead .sp { flex: 1; }
+.tlbody { display: grid; grid-template-columns: minmax(0, 1fr) 330px; }
+#tlSvg { width: 100%; display: block; user-select: none; touch-action: none; cursor: crosshair; }
+#tlSvg .kf { cursor: grab; }
+.tlkey { border-left: 1px solid var(--line); padding: 8px 10px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; height: 192px; overflow: auto; align-content: start; }
+.tlkey .kl { display: grid; gap: 6px; align-content: start; }
+.tlkey .kb { display: grid; gap: 2px; justify-items: center; align-content: start; }
+.tlkey .kr { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+.tlkey input, .tlkey select { font: inherit; font-size: 12px; padding: 2px 4px; width: 100%; border: 1px solid var(--line2); border-radius: 6px; }
+.tlkey .note { color: var(--muted); font-size: 11.5px; line-height: 1.6; }
+#tlBez { width: 104px; height: 152px; touch-action: none; }
 .stage { position: relative; min-height: 0; overflow: hidden; background: repeating-conic-gradient(var(--stage) 0 25%, var(--stage2) 0 50%) 0 0 / 24px 24px; color: var(--stage-ink); }
 .stage .frame { position: absolute; inset: 56px 24px 24px; display: grid; place-items: center; min-height: 0; }
 .chips { position: absolute; left: 16px; top: 14px; display: flex; gap: 8px; z-index: 5; }
@@ -298,6 +316,23 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
         <span class="muted" style="font-size:11.5px">滾輪縮放・中鍵／右鍵拖曳・雙擊重設</span>
         <span class="offnote">輸出 Spine 後可在這裡播放與比對</span>
       </div>
+      <div class="tl" id="tl" style="display:none">
+        <div class="tlhead">
+          <b>Timeline</b><span id="tlInfo"></span><span class="sp"></span>
+          <button id="tlAdd" title="在播放頭位置加關鍵格（加在選取的那一軌，沒選就加在縮放；也可以在軌道上雙擊）">＋關鍵格</button>
+          <button id="tlDel" title="刪除選取的關鍵格（Delete）">刪除</button>
+          <button id="tlUndo" title="復原（Ctrl+Z）">復原</button>
+          <label title="動畫總長（不能短於最後一個關鍵格）">總長 <input type="number" id="tlLen" min="1" max="600" step="1"> 格</label>
+          <label title="相機距離＝圖最長邊的幾倍，越小越立體">透視 <input type="number" id="tlPersp" min="1" max="6" step="0.1"></label>
+          <label title="轉離光源時最多壓暗多少">暗面 <input type="number" id="tlShade" min="0" max="0.6" step="0.05"></label>
+          <label>樣板名稱 <input type="text" id="tlName" maxlength="40"></label>
+          <button class="gold" id="tlSave" title="存成自訂樣板（只存樣板，不重跑）；套用並重跑時也會自動存">存成樣板</button>
+          <button id="tlDelTpl" hidden title="刪除這個自訂樣板">刪除樣板</button>
+          <button id="tlRevert" title="捨棄 Timeline 的修改，回到樣板原本的關鍵格">捨棄修改</button>
+          <button id="tlClose" title="收起 Timeline（修改會保留）">收起</button>
+        </div>
+        <div class="tlbody"><svg id="tlSvg"></svg><div class="tlkey" id="tlKey"></div></div>
+      </div>
     </div>
 
     <aside class="side tune">
@@ -305,7 +340,7 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
       <div class="pbody">
         <div class="empty" id="tuneEmpty">選擇設定檔後可在這裡調整動態。新建設定時，樣板與參數在「確認設定」裡調。</div>
         <div class="box curve" id="curveBox"><h4>目前動態 <small id="curveTitle"></small></h4><svg id="curve" viewBox="0 0 360 150"></svg><div class="legend" id="curveLegend"></div></div>
-        <div class="box form" id="animBox"><h4>樣板與參數 <small>預覽用 <select id="aSym" style="font-size:12px;padding:1px 4px"></select></small></h4><select id="aTpl"></select><span class="note" id="aTplNote"></span><div id="aParams"></div></div>
+        <div class="box form" id="animBox"><h4>樣板與參數 <small>預覽用 <select id="aSym" style="font-size:12px;padding:1px 4px"></select></small></h4><select id="aTpl"></select><span class="note" id="aTplNote"></span><button id="aTl" title="在中間下方開 Timeline，直接拖關鍵格、改緩動曲線">Timeline 編輯關鍵格</button><div id="aParams"></div></div>
       </div>
       <div class="foot" id="tuneFoot">
         <div class="err" id="aErr"></div>
@@ -905,21 +940,20 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
     return pts;
   }
   function animChart(t, W, H) {
-    const last = t.length || t.keys[t.keys.length - 1][0], tl = t.tilt?.keys || [];
+    const last = t.length || t.keys[t.keys.length - 1][0], tl = t.tilt, ry = tl?.ry || [], rx = tl?.rx || [];
     const pad = ks => ks[ks.length - 1][0] < last ? [...ks, [last, ...ks[ks.length - 1].slice(1, -1), null]] : ks;
     const keys = pad(t.keys), vals = keys.map(k => k[1]), lo = Math.min(0.9, ...vals), hi = Math.max(1.1, ...vals);
-    const amax = Math.max(10, ...tl.flatMap(k => [Math.abs(k[1]), Math.abs(k[2])]));
-    const L = 32, R = tl.length ? 28 : 6, T = 8, B = 20, x = f => L + (W - L - R) * f / last, y = v => T + (H - T - B) * (hi - v) / (hi - lo), ya = v => T + (H - T - B) * (amax - v) / (2 * amax);
+    const amax = Math.max(10, ...[...ry, ...rx].map(k => Math.abs(k[1])));
+    const L = 32, R = tl ? 28 : 6, T = 8, B = 20, x = f => L + (W - L - R) * f / last, y = v => T + (H - T - B) * (hi - v) / (hi - lo), ya = v => T + (H - T - B) * (amax - v) / (2 * amax);
     const line = (pts, yf, col) => `<polyline fill="none" stroke="${col}" stroke-width="1.6" points="${pts.map(([f, v]) => `${x(f).toFixed(1)},${yf(v).toFixed(1)}`).join(' ')}"/>`;
     let s = `<line x1="${L}" x2="${W - R}" y1="${y(1)}" y2="${y(1)}" stroke="#d6d0c4" stroke-opacity=".5" stroke-dasharray="3 3"/>`;
     for (const v of [lo, 1, hi]) s += `<text x="${L - 4}" y="${y(v) + 3}" text-anchor="end" font-size="9" fill="#847c70">${v.toFixed(2)}</text>`;
     for (let f = 0; f <= last; f += last > 120 ? 30 : 10) s += `<text x="${x(f)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="#847c70">${f}</text>`;
     let legend = '<span><i style="background:#c8901a"></i>縮放</span>';
-    if (tl.length) {
-      const tk = pad(tl);
+    if (tl) {
       for (const v of [amax, 0, -amax]) s += `<text x="${W - R + 3}" y="${ya(v) + 3}" font-size="9" fill="#6f8fb0">${Math.round(v)}°</text>`;
-      if (tk.some(k => k[1])) { s += line(trackPts(tk, t.curves, 1), ya, '#5b9bd5'); legend += '<span><i style="background:#5b9bd5"></i>左右角度</span>'; }
-      if (tk.some(k => k[2])) { s += line(trackPts(tk, t.curves, 2), ya, '#4fb38a'); legend += '<span><i style="background:#4fb38a"></i>前後角度</span>'; }
+      if (ry.some(k => k[1])) { s += line(trackPts(pad(ry), t.curves, 1), ya, '#5b9bd5'); legend += '<span><i style="background:#5b9bd5"></i>左右角度</span>'; }
+      if (rx.some(k => k[1])) { s += line(trackPts(pad(rx), t.curves, 1), ya, '#4fb38a'); legend += '<span><i style="background:#4fb38a"></i>前後角度</span>'; }
     }
     s += line(trackPts(keys, t.curves, 1), y, '#c8901a') + t.keys.map(([f, v]) => `<circle cx="${x(f)}" cy="${y(v)}" r="2.4" fill="#c8901a"><title>第 ${f} 格：${v}</title></circle>`).join('');
     return { svg: s, legend, x, L, R };
@@ -990,7 +1024,7 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
     const cx = cv.width / 2, cy = cv.height / 2;
     let lit = 1;
     if (tl) {
-      const [gx, gy] = tl.grid || [8, 8], ry = sampleTrack(tl.keys, t.curves, f, 1), rx = sampleTrack(tl.keys, t.curves, f, 2);
+      const [gx, gy] = tl.grid || [8, 8], ry = sampleTrack(tl.ry, t.curves, f, 1), rx = sampleTrack(tl.rx, t.curves, f, 1);
       const p = projectGrid(w, h, gx, gy, ry, rx, (tl.perspective ?? 2.2) * Math.max(w, h)); lit = p.lit;
       const scr = ([x, y]) => [cx + x * sc, cy - y * sc], at = (i, j) => scr(p.pts[j * (gx + 1) + i]), src = (i, j) => [w * i / gx, h * j / gy];
       for (let j = 0; j < gy; j++) for (let i = 0; i < gx; i++) {
@@ -1035,7 +1069,7 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
     let g = sel.nextElementSibling?.classList.contains('tgal') ? sel.nextElementSibling : null;
     if (!g) { g = document.createElement('div'); g.className = 'tgal'; sel.after(g); }
     sel.style.display = 'none';
-    g.innerHTML = templates.map(t => `<button type="button" class="tcard ${t.name === sel.value ? 'on' : ''}" data-n="${esc(t.name)}" title="${esc(t.description)}"><canvas></canvas><b>${esc(t.title || t.name)}</b>${t.tilt ? '<small>偽 3D</small>' : ''}</button>`).join('');
+    g.innerHTML = templates.map(t => `<button type="button" class="tcard ${t.name === sel.value ? 'on' : ''}" data-n="${esc(t.name)}" title="${esc(t.description)}"><canvas></canvas><b>${esc(t.title || t.name)}</b>${t.custom || t.tilt ? `<small>${[t.custom && '自訂', t.tilt && '偽 3D'].filter(Boolean).join('・')}</small>` : ''}</button>`).join('');
     const cards = [...g.querySelectorAll('.tcard')], pvs = [];
     cards.forEach(c => {
       const name = c.dataset.n; let tt = null;
@@ -1047,8 +1081,8 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
   }
 
   // 樣板參數編輯：每個參數一列（滑桿＋數字），變動時向小幫手要展開後的樣板畫曲線
-  function paramEditor(box, getName, initial, getSrc) {
-    let vals = { ...(initial || {}) }, timer = null, cur = null, pv = null;
+  function paramEditor(box, getName, initial, getSrc, onLoaded) {
+    let vals = { ...(initial || {}) }, timer = null, cur = null, pv = null, ov = null;
     const meta = () => templates?.find(t => t.name === getName());
     const values = () => Object.fromEntries((meta()?.params || []).map(p => [p.key, vals[p.key] ?? p.default]));
     function render() {
@@ -1068,19 +1102,253 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
     }
     function redraw(now) {
       clearTimeout(timer);
+      if (ov) return show(ov);
       timer = setTimeout(async () => {
         const t = await fetch(`${API}api/template?${new URLSearchParams({ name: getName(), params: JSON.stringify(values()) })}`).then(r => r.json()).catch(() => null);
-        const svg = box.querySelector('.pchart'), info = box.querySelector('.pinfo');
-        if (!svg || !t) return;
-        cur = t;
-        if (t.error) { svg.innerHTML = ''; info.textContent = t.error; info.style.color = '#ff9a8b'; return; }
-        const r = animChart(t, 340, 120);
-        svg.innerHTML = r.svg; box.querySelector('.legend').innerHTML = r.legend;
-        info.style.color = ''; info.textContent = `共 ${t.length} 格（${(t.length / (t.fps || 30)).toFixed(2)} 秒）`;
+        if (!t || ov) return;
+        show(t);
+        if (!t.error) onLoaded?.(t);
       }, now ? 0 : 120);
     }
+    function show(t) {
+      const svg = box.querySelector('.pchart'), info = box.querySelector('.pinfo'), grid = box.querySelector('.pgrid');
+      if (!svg) return;
+      cur = t;
+      if (grid) grid.style.display = ov ? 'none' : '';
+      if (t.error) { svg.innerHTML = ''; info.textContent = t.error; info.style.color = '#ff9a8b'; return; }
+      const r = animChart(t, 340, 120);
+      svg.innerHTML = r.svg; box.querySelector('.legend').innerHTML = r.legend;
+      info.style.color = ov ? 'var(--accent)' : ''; info.textContent = `共 ${t.length} 格（${(t.length / (t.fps || 30)).toFixed(2)} 秒）` + (ov ? '・Timeline 修改中：參數滑桿暫停，存成樣板後可再調透視與暗面' : '');
+    }
     render();
-    return { values, reset(v) { vals = { ...(v || {}) }; render(); }, setSrc: s => pv?.setImg(s || demoImg()) };
+    return {
+      values, reset(v) { vals = { ...(v || {}) }; ov = null; render(); }, setSrc: s => pv?.setImg(s || demoImg()),
+      current: () => cur, preview: () => pv, setOverride(t) { ov = t; redraw(true); },
+      pause() { if (pv) pv.playing = false; const b = box.querySelector('.pvplay'); if (b) b.textContent = '▶'; },
+    };
+  }
+
+  // ---------- Timeline 編輯器：三軌（縮放／左右角度／前後角度）拖關鍵格、改緩動；改完存成自訂樣板 custom_*.json ----------
+  const EASES = [['線性', null], ['緩入緩出', [0.4, 0, 0.6, 1]], ['緩出', [0.2, 0.6, 0.4, 1]], ['緩入', [0.55, 0, 0.95, 0.7]], ['彈出', [0.3, 1.6, 0.6, 1]]];
+  const TRK = [
+    { id: 'scale', label: '縮放', col: '#c8901a', step: 0.01, unit: '倍', base: 1 },
+    { id: 'ry', label: '左右角度', col: '#5b9bd5', step: 0.5, unit: '°', base: 0 },
+    { id: 'rx', label: '前後角度', col: '#4fb38a', step: 0.5, unit: '°', base: 0 }];
+  const TL = { on: false, d: null, sel: null, hist: [], dirty: false, ranges: null, onChange: null, getPv: null };
+  const tlLW = 92, tlRH = 22, tlLH = 56, tlMax = 600;
+  const tlPad = (ks, len) => ks[ks.length - 1][0] < len ? [...ks, [len, ks[ks.length - 1][1], null]] : ks;
+  const tlLast = d => Math.max(...TRK.map(t => d[t.id][d[t.id].length - 1][0]));
+  // 展開後的樣板 → 編輯資料（曲線名稱一律換成 [cx1, cy1, cx2, cy2]）
+  function tlLoad(t, name) {
+    const fix = ks => ks.map(k => [k[0], k[1], typeof k[2] === 'string' ? (t.curves?.[k[2]] || null) : (k[2] || null)]);
+    const title = templates?.find(x => x.name === name)?.title || name;
+    TL.d = {
+      fps: t.fps || 30, len: t.length, scale: fix(t.keys), ry: fix(t.tilt?.ry || [[0, 0, null]]), rx: fix(t.tilt?.rx || [[0, 0, null]]),
+      perspective: t.tilt?.perspective ?? 2.2, shade: t.tilt?.shade ?? 0.25, grid: t.tilt?.grid || [8, 8], tilt: !!t.tilt,
+      name: t.custom ? name : null, base: t.custom ? t.base : name, title: t.custom ? title : `${title}・自訂`,
+      description: t.custom ? t.description : `以「${title}」為底，用 Timeline 調整的動態`,
+    };
+    TL.sel = null; TL.hist = []; TL.dirty = false; TL.ranges = null;
+    tlRender();
+  }
+  // 編輯資料 → 展開後的樣板格式（預覽、曲線圖、存檔共用）
+  function tlTemplate(d = TL.d) {
+    const tilt = d.tilt || [...d.ry, ...d.rx].some(k => k[1]);
+    return { title: d.title, fps: d.fps, curves: {}, length: d.len, keys: tlPad(d.scale, d.len), ...(tilt ? { tilt: { perspective: d.perspective, shade: d.shade, grid: d.grid, ry: d.ry, rx: d.rx } } : {}) };
+  }
+  function tlRange(id, ks) {
+    const vs = ks.map(k => k[1]);
+    if (id === 'scale') { const lo = Math.min(0.9, ...vs), hi = Math.max(1.1, ...vs), p = (hi - lo) * 0.12; return [lo - p, hi + p]; }
+    const a = Math.max(15, ...vs.map(Math.abs)) * 1.15; return [-a, a];
+  }
+  function tlGeo() {
+    const d = TL.d, W = $('tlSvg').clientWidth || 800, span = W - tlLW - 14;
+    const rg = TL.ranges || Object.fromEntries(TRK.map(t => [t.id, tlRange(t.id, d[t.id])]));
+    const y = (id, v) => { const i = TRK.findIndex(t => t.id === id), [lo, hi] = rg[id]; return tlRH + i * tlLH + 7 + (tlLH - 14) * (hi - v) / (hi - lo); };
+    return { W, H: tlRH + TRK.length * tlLH + 2, ppf: span / d.len, x: f => tlLW + span * f / d.len, fx: px => (px - tlLW) / span * d.len, y, rg };
+  }
+  const tlFmt = (T, v) => T.id === 'scale' ? v.toFixed(2) + ' 倍' : v.toFixed(1) + '°';
+  function tlRender(keepPanel) {
+    const d = TL.d, svg = $('tlSvg');
+    if (!TL.on || !d) return;
+    const g = tlGeo();
+    svg.setAttribute('viewBox', `0 0 ${g.W} ${g.H}`); svg.style.height = g.H + 'px';
+    let s = `<rect x="0" y="0" width="${g.W}" height="${tlRH}" fill="#faf8f4"/>`;
+    const step = [1, 2, 5, 10, 15, 30, 60, 120].find(n => n * g.ppf >= 30) || 120;
+    for (let f = 0; f <= d.len; f += step) s += `<line x1="${g.x(f)}" x2="${g.x(f)}" y1="${tlRH - 5}" y2="${g.H}" stroke="#e4dfd6"/><text x="${g.x(f)}" y="14" font-size="10" text-anchor="middle" fill="#847c70">${f}</text>`;
+    TRK.forEach((T, i) => {
+      const top = tlRH + i * tlLH, ks = d[T.id];
+      s += `<rect x="0" y="${top}" width="${g.W}" height="${tlLH}" fill="${i % 2 ? 'rgba(200,144,26,.04)' : 'transparent'}" stroke="#eee9e0"/>`;
+      s += `<line x1="${tlLW}" x2="${g.W}" y1="${g.y(T.id, T.base)}" y2="${g.y(T.id, T.base)}" stroke="#d6d0c4" stroke-dasharray="3 3"/>`;
+      s += `<text x="10" y="${top + 22}" font-size="12" font-weight="700" fill="${T.col}">${T.label}</text><text class="tlv" data-v="${T.id}" x="10" y="${top + 40}" font-size="11" fill="#847c70"></text>`;
+      s += `<polyline fill="none" stroke="${T.col}" stroke-width="1.6" pointer-events="none" points="${trackPts(tlPad(ks, d.len), {}, 1).map(([f, v]) => `${g.x(f).toFixed(1)},${g.y(T.id, v).toFixed(1)}`).join(' ')}"/>`;
+      ks.forEach((k, j) => {
+        const on = TL.sel?.t === T.id && TL.sel.i === j, X = g.x(k[0]), Y = g.y(T.id, k[1]), r = on ? 7 : 5.5;
+        s += `<path class="kf" data-t="${T.id}" data-i="${j}" d="M${X} ${Y - r}L${X + r} ${Y}L${X} ${Y + r}L${X - r} ${Y}Z" fill="${on ? '#fff' : T.col}" stroke="${on ? T.col : '#fff'}" stroke-width="${on ? 2.4 : 1.2}"><title>第 ${k[0]} 格：${tlFmt(T, k[1])}</title></path>`;
+      });
+    });
+    s += `<line x1="${tlLW}" x2="${tlLW}" y1="0" y2="${g.H}" stroke="#e4dfd6"/><line id="tlHead" x1="0" x2="0" y1="0" y2="${g.H}" stroke="#d4513f" stroke-width="1.5" pointer-events="none"/>`;
+    svg.innerHTML = s;
+    TL.lastF = null;
+    $('tlInfo').textContent = `${d.len} 格・${(d.len / d.fps).toFixed(2)} 秒${TL.dirty ? '・已修改，還沒存成樣板' : ''}`;
+    $('tlInfo').style.color = TL.dirty ? 'var(--accent)' : '';
+    const ln = $('tlLen'); if (document.activeElement !== ln) { ln.value = d.len; ln.min = tlLast(d); }
+    if (document.activeElement !== $('tlName')) $('tlName').value = d.title;
+    $('tlPersp').value = d.perspective; $('tlShade').value = d.shade;
+    $('tlDelTpl').hidden = !d.name;
+    $('aTl').textContent = TL.dirty ? 'Timeline（已修改）' : 'Timeline 編輯關鍵格';
+    if (!keepPanel) tlKeyPanel();
+  }
+  // 播放頭跟著右側即時預覽走
+  function tlTick() {
+    if (!TL.on) return;
+    const pv = TL.getPv?.(), d = TL.d, head = $('tlHead');
+    if (pv && d && head) {
+      const g = tlGeo(), f = Math.min(pv.f, d.len), X = g.x(f).toFixed(1);
+      head.setAttribute('x1', X); head.setAttribute('x2', X);
+      if (Math.floor(f) !== TL.lastF) {
+        TL.lastF = Math.floor(f);
+        document.querySelectorAll('#tlSvg .tlv').forEach(el => { const T = TRK.find(t => t.id === el.dataset.v); el.textContent = tlFmt(T, sampleTrack(tlPad(d[T.id], d.len), {}, f, 1)); });
+      }
+    }
+    requestAnimationFrame(tlTick);
+  }
+  function tlPush() { TL.hist.push(JSON.parse(JSON.stringify(TL.d))); if (TL.hist.length > 100) TL.hist.shift(); }
+  function tlChanged(keepPanel) { TL.dirty = true; TL.d.len = Math.max(TL.d.len, tlLast(TL.d)); tlRender(keepPanel); TL.onChange?.(); }
+  function tlUndo() { const d = TL.hist.pop(); if (!d) return toast('沒有可以復原的步驟'); TL.d = d; TL.sel = null; tlChanged(); }
+  function tlAddKey(id, f) {
+    const d = TL.d, ks = d[id];
+    f = Math.max(0, Math.min(tlMax, Math.round(f)));
+    const hit = ks.findIndex(k => k[0] === f);
+    if (hit >= 0) { TL.sel = { t: id, i: hit }; return tlRender(); }
+    tlPush();
+    const j = ks.findIndex(k => k[0] > f), at = j < 0 ? ks.length : j, prev = ks[at - 1];
+    ks.splice(at, 0, [f, +sampleTrack(tlPad(ks, d.len), {}, f, 1).toFixed(4), prev ? prev[2] : null]);
+    TL.sel = { t: id, i: at }; tlChanged();
+  }
+  function tlDelKey() {
+    const s = TL.sel; if (!s) return;
+    if (s.i === 0) return toast('第 0 格的關鍵格不能刪（可以改它的數值）', true);
+    tlPush(); TL.d[s.t].splice(s.i, 1); TL.sel = null; tlChanged();
+  }
+  // 改選取關鍵格的格數／數值：格數夾在前後關鍵格之間
+  function tlSetKey(f, v) {
+    const s = TL.sel, ks = TL.d[s.t], T = TRK.find(t => t.id === s.t), k = ks[s.i];
+    if (s.i === 0) f = 0;
+    else f = Math.max(ks[s.i - 1][0] + 1, Math.min(s.i < ks.length - 1 ? ks[s.i + 1][0] - 1 : tlMax, Math.round(f)));
+    v = +(Math.round(v / T.step) * T.step).toFixed(4);
+    if (T.id === 'scale') v = Math.max(0, v);
+    ks[s.i] = [f, v, k[2]];
+  }
+  function tlKeyPanel() {
+    const box = $('tlKey'), s = TL.sel;
+    if (!s) {
+      box.innerHTML = `<div class="kl"><b>關鍵格</b><span class="note">點菱形選取，可改格數、數值與緩動。<br>軌道空白處雙擊＝新增關鍵格<br>拖曳時按住 Shift 只改格數、Ctrl 只改數值<br>← → 移一格・↑ ↓ 改數值・Delete 刪除・Ctrl+Z 復原<br>點尺規可移動播放頭</span></div>`;
+      return;
+    }
+    const T = TRK.find(t => t.id === s.t), ks = TL.d[s.t], k = ks[s.i], last = s.i === ks.length - 1;
+    const pre = EASES.findIndex(([, c]) => JSON.stringify(c) === JSON.stringify(k[2]));
+    box.innerHTML = `<div class="kl"><b style="color:${T.col}">${T.label}・第 ${s.i + 1} 個關鍵格</b>
+      <label class="kr"><span>格數</span><input type="number" id="tkF" min="0" max="${tlMax}" step="1" value="${k[0]}" ${s.i === 0 ? 'disabled title="第一個關鍵格固定在第 0 格"' : ''}></label>
+      <label class="kr"><span>數值</span><input type="number" id="tkV" step="${T.step}" value="${k[1]}"><small>${T.unit}</small></label>
+      <label class="kr"><span>緩動</span><select id="tkE" ${last ? 'disabled' : ''}>${EASES.map(([n], i) => `<option value="${i}" ${i === pre ? 'selected' : ''}>${n}</option>`).join('')}${pre < 0 ? '<option value="-1" selected>自訂曲線</option>' : ''}</select></label>
+      <span class="note">${last ? '最後一個關鍵格：之後保持這個數值到結尾' : '右圖拖兩個控制點，調這一段（到下一個關鍵格）的速度曲線'}</span></div>
+      ${last ? '' : '<div class="kb"><svg id="tlBez" viewBox="-14 -44 128 188"></svg></div>'}`;
+    $('tkF').onchange = () => { tlPush(); tlSetKey(+$('tkF').value, k[1]); tlChanged(); };
+    $('tkV').onchange = () => { if (!Number.isFinite(+$('tkV').value)) return; tlPush(); tlSetKey(ks[s.i][0], +$('tkV').value); tlChanged(); };
+    $('tkE').onchange = () => { const i = +$('tkE').value; if (i < 0) return; tlPush(); ks[s.i][2] = EASES[i][1] && [...EASES[i][1]]; tlChanged(); };
+    if (!last) { tlBez(); tlBezBind(); }
+  }
+  // 貝茲曲線小編輯器：橫軸＝時間、縱軸＝數值進度，(0,0)→(1,1)
+  function tlBez() {
+    const svg = $('tlBez'); if (!svg) return;
+    const s = TL.sel, k = TL.d[s.t][s.i], c = k[2] || [1 / 3, 1 / 3, 2 / 3, 2 / 3], P = (u, v) => [u * 100, 100 - v * 100];
+    const [a, b] = [P(c[0], c[1]), P(c[2], c[3])];
+    svg.innerHTML = `<rect x="0" y="0" width="100" height="100" fill="#faf8f4" stroke="#e4dfd6"/>
+      <line x1="0" y1="100" x2="${a[0]}" y2="${a[1]}" stroke="#b9b3a8"/><line x1="100" y1="0" x2="${b[0]}" y2="${b[1]}" stroke="#b9b3a8"/>
+      <path d="M0 100C${a[0]} ${a[1]} ${b[0]} ${b[1]} 100 0" fill="none" stroke="${TRK.find(t => t.id === s.t).col}" stroke-width="2.2"/>
+      <circle data-h="0" cx="${a[0]}" cy="${a[1]}" r="6" fill="#fff" stroke="#2a2620" stroke-width="1.5" style="cursor:grab"/>
+      <circle data-h="1" cx="${b[0]}" cy="${b[1]}" r="6" fill="#fff" stroke="#2a2620" stroke-width="1.5" style="cursor:grab"/>`;
+  }
+  function tlBezBind() {
+    const svg = $('tlBez');
+    let h = -1, pushed = false;
+    svg.onpointerdown = e => { const el = e.target.closest('[data-h]'); if (!el) return; h = +el.dataset.h; pushed = false; svg.setPointerCapture(e.pointerId); };
+    svg.onpointermove = e => {
+      if (h < 0) return;
+      const k = TL.d[TL.sel.t][TL.sel.i], p = new DOMPoint(e.clientX, e.clientY).matrixTransform(svg.getScreenCTM().inverse());
+      if (!pushed) { tlPush(); pushed = true; }
+      const cc = k[2] ? [...k[2]] : [0.33, 0.33, 0.67, 0.67];
+      cc[h * 2] = +Math.max(0, Math.min(1, p.x / 100)).toFixed(2); cc[h * 2 + 1] = +Math.max(-0.4, Math.min(1.4, (100 - p.y) / 100)).toFixed(2);
+      k[2] = cc; tlChanged(true); tlBez();
+      const sel = $('tkE'), i = EASES.findIndex(([, c]) => JSON.stringify(c) === JSON.stringify(cc));
+      if (i < 0 && ![...sel.options].some(o => o.value === '-1')) sel.add(new Option('自訂曲線', '-1'));
+      sel.value = String(i);
+    };
+    svg.onpointerup = svg.onpointercancel = () => { h = -1; };
+  }
+  {
+    const svg = $('tlSvg');
+    let drag = null;
+    const pos = e => { const r = svg.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    const scrub = px => { const pv = TL.getPv?.(); if (!pv) return; pv.playing = false; pv.f = Math.max(0, Math.min(TL.d.len, Math.round(tlGeo().fx(px)))); TL.onPause?.(); };
+    svg.addEventListener('pointerdown', e => {
+      if (!TL.d || e.button !== 0) return;
+      const [px, py] = pos(e), kf = e.target.closest('.kf');
+      if (kf) {
+        const t = kf.dataset.t, i = +kf.dataset.i, k = TL.d[t][i], g = tlGeo();
+        TL.sel = { t, i }; TL.ranges = g.rg; tlPush();
+        drag = { kind: 'key', cx: e.clientX, cy: e.clientY, f: k[0], v: k[1], ppf: g.ppf, moved: false };
+        svg.setPointerCapture(e.pointerId); tlRender(); return;
+      }
+      if (px < tlLW) return;
+      if (py >= tlRH && TL.sel) { TL.sel = null; tlRender(); }
+      drag = { kind: 'scrub' }; svg.setPointerCapture(e.pointerId); scrub(px);
+    });
+    svg.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const [px] = pos(e);
+      if (drag.kind === 'scrub') return scrub(px);
+      const T = TRK.find(t => t.id === TL.sel.t), [lo, hi] = TL.ranges[T.id];
+      const dx = e.clientX - drag.cx, dy = e.clientY - drag.cy, f = e.ctrlKey ? drag.f : drag.f + dx / drag.ppf, v = e.shiftKey ? drag.v : drag.v - dy * (hi - lo) / (tlLH - 14);
+      if (!drag.moved && Math.hypot(dx, dy) < 3) return;
+      drag.moved = true; tlSetKey(f, v); tlChanged();
+    });
+    const end = () => { if (drag?.kind === 'key') { if (!drag.moved) TL.hist.pop(); TL.ranges = null; tlRender(); } drag = null; };
+    svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
+    svg.addEventListener('dblclick', e => {
+      if (!TL.d || e.target.closest('.kf')) return;
+      const [px, py] = pos(e), T = TRK[Math.floor((py - tlRH) / tlLH)];
+      if (px < tlLW || py < tlRH || !T) return;
+      tlAddKey(T.id, tlGeo().fx(px));
+    });
+    document.addEventListener('keydown', e => {
+      if (!TL.on || $('tl').style.display === 'none' || /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName)) return;
+      if (e.ctrlKey && e.key.toLowerCase() === 'z') { e.preventDefault(); return tlUndo(); }
+      const s = TL.sel; if (!s) return;
+      const T = TRK.find(t => t.id === s.t), k = TL.d[s.t][s.i];
+      const mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[e.key];
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); tlDelKey(); }
+      else if (mv) { e.preventDefault(); tlPush(); tlSetKey(k[0] + mv[0] * (e.shiftKey ? 5 : 1), k[1] + mv[1] * T.step * (e.shiftKey ? 10 : 1)); tlChanged(); }
+    });
+    new ResizeObserver(() => tlRender(true)).observe(svg);
+    $('tlAdd').onclick = () => { const pv = TL.getPv?.(); tlAddKey(TL.sel?.t || 'scale', pv ? pv.f : 0); };
+    $('tlDel').onclick = tlDelKey;
+    $('tlUndo').onclick = tlUndo;
+    $('tlLen').onchange = () => { const v = Math.round(+$('tlLen').value); if (!Number.isFinite(v)) return; tlPush(); TL.d.len = Math.max(tlLast(TL.d), 1, Math.min(tlMax, v)); tlChanged(); };
+    $('tlName').oninput = () => { if (TL.d) TL.d.title = $('tlName').value.trim() || '自訂動態'; };
+    $('tlPersp').onchange = () => { const v = +$('tlPersp').value; if (!(v >= 1 && v <= 6)) return tlRender(); tlPush(); TL.d.perspective = v; tlChanged(); };
+    $('tlShade').onchange = () => { const v = +$('tlShade').value; if (!(v >= 0 && v <= 0.6)) return tlRender(); tlPush(); TL.d.shade = v; tlChanged(); };
+  }
+  // 存成自訂樣板：從自訂樣板開的會覆蓋原檔，從內建樣板開的另存新檔
+  async function tlSave() {
+    const d = TL.d, t = tlTemplate(d);
+    const r = await fetch(API + 'api/template/save', { method: 'POST', body: JSON.stringify({ name: d.name, title: d.title, description: d.description, base: d.base, fps: d.fps, keys: t.keys, tilt: t.tilt || null }) }).then(r => r.json()).catch(() => ({ error: '本機小幫手沒有回應' }));
+    if (r.error) { toast(r.error, true); return null; }
+    d.name = r.name; TL.dirty = false; delete tplDefault[r.name];
+    templates = await fetch(API + 'api/templates').then(r => r.json());
+    tlRender();
+    return r.name;
   }
 
   // 設定分頁：改目前設定檔的樣板與參數，套用後從 Spine 動畫重跑
@@ -1100,15 +1368,51 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
     const tx = S.textures || {}, codes = S.config.symbols.map(x => x.code).filter(c => tx[c]);
     $('aSym').innerHTML = codes.map(c => `<option>${esc(c)}</option>`).join('') || '<option value="">示範圖</option>';
     const aSrc = () => { const t = tx[$('aSym').value]; return t ? bust(fileUrl(`${S.spineDir}/Images/${t.skeleton}/${t.image}.png`), S.spineMtime || 1) : null; };
-    aEditor = paramEditor($('aParams'), () => $('aTpl').value, a.params, aSrc);
-    const aGal = templateGallery($('aTpl'), aSrc);
+    // Timeline 沒修改時跟著樣板／參數走；修改後預覽改用 Timeline 的關鍵格
+    TL.dirty = false;
+    aEditor = paramEditor($('aParams'), () => $('aTpl').value, a.params, aSrc, t => { if (TL.on && !TL.dirty) tlLoad(t, $('aTpl').value); });
+    TL.getPv = () => aEditor.preview(); TL.onPause = () => aEditor.pause(); TL.onChange = () => aEditor.setOverride(tlTemplate());
+    let aGal = templateGallery($('aTpl'), aSrc), aPrev = $('aTpl').value;
+    const pick = name => { $('aTpl').value = name; aPrev = name; $('aTpl').nextElementSibling.querySelectorAll('.tcard').forEach(c => c.classList.toggle('on', c.dataset.n === name)); note(); };
     $('aSym').onchange = () => { aEditor.setSrc(aSrc()); aGal.setSrc(aSrc() || demoImg()); };
-    $('aTpl').onchange = () => { note(); aEditor.reset($('aTpl').value === a.template ? a.params : {}); };
-    $('aReset').onclick = () => { $('aTpl').value = a.template; note(); aEditor.reset(a.params); $('aTpl').nextElementSibling.querySelectorAll('.tcard').forEach(c => c.classList.toggle('on', c.dataset.n === a.template)); };
+    $('aTpl').onchange = () => {
+      if (TL.dirty && !confirm('Timeline 的修改還沒存成樣板，換樣板會捨棄這些修改。確定要換嗎？')) return pick(aPrev);
+      TL.dirty = false; aPrev = $('aTpl').value; note(); aEditor.reset($('aTpl').value === a.template ? a.params : {});
+    };
+    $('aReset').onclick = () => { TL.dirty = false; pick(a.template); aEditor.reset(a.params); };
+    // 存成樣板後：重建樣板清單並選到新樣板
+    tlAfterSave = name => {
+      $('aTpl').innerHTML = templates.map(t => `<option value="${esc(t.name)}">${esc(t.title || t.name)}</option>`).join('');
+      aGal = templateGallery($('aTpl'), aSrc); pick(name); aEditor.reset({});
+    };
   }
+  let tlAfterSave = () => {};
+  $('aTl').onclick = () => {
+    if (!aEditor) return;
+    const was = TL.on;
+    $('tl').style.display = ''; TL.on = true;
+    if (!TL.d || !TL.dirty) { const t = aEditor.current(); if (t && !t.error) tlLoad(t, $('aTpl').value); }
+    tlRender(); if (!was) requestAnimationFrame(tlTick);
+    $('aParams').querySelector('.pvbox')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });  // 右側即時預覽跟著 Timeline 播
+  };
+  $('tlClose').onclick = () => { $('tl').style.display = 'none'; TL.on = false; };
+  $('tlRevert').onclick = () => { if (TL.dirty && !confirm('捨棄 Timeline 的修改？')) return; TL.dirty = false; aEditor.setOverride(null); };
+  $('tlSave').onclick = async () => { const n = await tlSave(); if (n) { toast(`已存成自訂樣板「${TL.d.title}」`); tlAfterSave(n); } };
+  $('tlDelTpl').onclick = async () => {
+    const d = TL.d; if (!d?.name || !confirm(`刪除自訂樣板「${d.title}」？`)) return;
+    const r = await fetch(API + 'api/template/delete', { method: 'POST', body: JSON.stringify({ name: d.name }) }).then(r => r.json()).catch(() => ({ error: '本機小幫手沒有回應' }));
+    if (r.error) return toast(r.error, true);
+    templates = await fetch(API + 'api/templates').then(r => r.json());
+    toast('已刪除'); TL.dirty = false; tlAfterSave(S.config.animation.template);
+  };
   $('aApply').onclick = async () => {
     if (!S || job?.running) return;
-    const r = await fetch(API + 'api/config/anim', { method: 'POST', body: JSON.stringify({ name: S.name, template: $('aTpl').value, params: aEditor.values() }) }).then(r => r.json());
+    let template = $('aTpl').value, params = aEditor.values();
+    if (TL.dirty) {  // Timeline 改過：先存成自訂樣板再套用
+      template = await tlSave(); if (!template) return;
+      params = { persp: TL.d.perspective, shade: TL.d.shade };
+    }
+    const r = await fetch(API + 'api/config/anim', { method: 'POST', body: JSON.stringify({ name: S.name, template, params }) }).then(r => r.json());
     if (r.error) { $('aErr').textContent = r.error; return; }
     $('aErr').textContent = '';
     await load();
@@ -1223,7 +1527,7 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
 
   // ---------- 啟動 ----------
   // ---------- 本機小幫手 ----------
-  const UI_VERSION = '0.4.0';  // 跟 web/server.js 的 VERSION 一致（build_site.js 會檢查）
+  const UI_VERSION = '0.5.0';  // 跟 web/server.js 的 VERSION 一致（build_site.js 會檢查）
   $('uiVer').textContent = 'v' + UI_VERSION;
   let helper = null;
   const checksHtml = h => `<div class="checks">${h.checks.map(c => `<div class="${c.ok ? 'y' : 'n'}"><i>${c.ok ? '✓' : '✗'}</i><span>${esc(c.name)}${c.ok ? '' : `<small>　${esc(c.hint)}</small>`}</span></div>`).join('')}</div>`;
