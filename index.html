@@ -66,13 +66,17 @@ button:disabled { opacity: .45; cursor: default; }
 .stage-step.run .bar { display: block; }
 
 /* 主區 */
-.main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }
+.main { display: grid; grid-template-columns: 340px minmax(0, 1fr) 360px; min-height: 0; }
+@media (max-width: 1400px) { .main { grid-template-columns: 300px minmax(0, 1fr) 320px; } }
 .center { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; }
 .stage { position: relative; min-height: 0; overflow: hidden; background: repeating-conic-gradient(var(--stage) 0 25%, var(--stage2) 0 50%) 0 0 / 24px 24px; color: var(--stage-ink); }
 .stage .frame { position: absolute; inset: 56px 24px 24px; display: grid; place-items: center; min-height: 0; }
 .chips { position: absolute; left: 16px; top: 14px; display: flex; gap: 8px; z-index: 5; }
 .chip { font-size: 12px; border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: 2px 10px; background: rgba(20,20,22,.55); }
 .chip.gold { border-color: var(--accent); color: #f3c96a; }
+.stagebar { position: absolute; left: 16px; bottom: 14px; z-index: 6; display: none; gap: 10px; align-items: center; background: rgba(18,18,20,.85); border: 1px solid rgba(255,255,255,.18); border-radius: 10px; padding: 8px 12px; font-size: 12.5px; color: #e9e5dc; backdrop-filter: blur(4px); }
+.stagebar.on { display: flex; }
+.stagebar .y { color: #7fd6a4; }
 .res { position: absolute; right: 16px; top: 16px; font-family: var(--mono); font-size: 11.5px; color: #e9c46a; z-index: 5; }
 /* 左上角進度回報 */
 .prog { position: absolute; left: 16px; top: 48px; z-index: 6; width: 300px; background: rgba(18,18,20,.82); border: 1px solid rgba(255,255,255,.18); border-radius: 10px; padding: 10px 12px; display: none; gap: 6px; backdrop-filter: blur(4px); }
@@ -144,7 +148,9 @@ button:disabled { opacity: .45; cursor: default; }
 .tile .pair img { max-width: 100%; max-height: 120px; display: block; }
 .tile .pair .ph { height: 70px; border: 1px dashed rgba(255,255,255,.2); border-radius: 6px; display: grid; place-items: center; font-size: 11px; color: #9a958c; }
 .tile .facts { font-family: var(--mono); font-size: 11px; color: #c9c4ba; }
-.canvaswrap canvas { display: block; image-rendering: pixelated; box-shadow: 0 0 0 1px rgba(255,255,255,.2); }
+.canvaswrap { position: absolute; inset: 0; }
+.canvaswrap canvas { display: block; width: 100%; height: 100%; cursor: default; }
+.canvaswrap canvas.drag { cursor: grabbing; }
 .atlasbox { position: relative; background: repeating-conic-gradient(#555 0 25%, #4a4a4a 0 50%) 0 0 / 12px 12px; outline: 1px dashed rgba(243,201,106,.7); }
 .atlasbox img { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 .atlasbox .r { position: absolute; border: 1px solid #f3c96a; }
@@ -169,8 +175,14 @@ button:disabled { opacity: .45; cursor: default; }
 .controls .offnote { display: none; }
 .controls.off .offnote { display: block; }
 
-/* 右側資訊 */
-.side { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; background: var(--panel); border-left: 1px solid var(--line); }
+/* 左側資訊、右側參數 */
+.side { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; background: var(--panel); border-right: 1px solid var(--line); }
+.side.tune { border-right: 0; border-left: 1px solid var(--line); }
+.tune .phead { padding: 12px 14px; border-bottom: 1px solid var(--line); display: grid; gap: 2px; }
+.tune .phead b { font-size: 14px; }
+.tune .phead small { color: var(--muted); font-size: 12px; }
+.tune .pbody { min-height: 0; overflow: auto; padding: 14px; display: grid; gap: 12px; align-content: start; }
+.tune .empty { color: var(--muted); font-size: 12.5px; }
 .tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); }
 .tabs button { border: 0; border-radius: 0; background: none; padding: 12px 0; font-weight: 700; color: var(--muted); border-bottom: 2px solid transparent; }
 .tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
@@ -213,7 +225,7 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
 <div class="app">
   <header class="top">
     <div class="logo" aria-hidden="true"></div>
-    <div class="brand"><b>簡易圖騰動畫產生器</b><span class="ver">雛型</span><span>丟入 PSD → 拆圖 → Spine 動畫 → 確認尺寸 → 輸出 → 驗證 → 登記展示台</span></div>
+    <div class="brand"><b>簡易圖騰動畫產生器</b><span class="ver" id="uiVer"></span><span>丟入 PSD → 拆圖 → Spine 動畫 → 確認尺寸 → 輸出 → 驗證 → 登記展示台</span></div>
     <span class="spacer"></span>
     <button class="helper" id="helperChip" title="本機小幫手（呼叫 Photoshop、Spine）">連線中…</button>
     <select id="cfgSel" title="已匯入的設定檔"></select>
@@ -233,6 +245,22 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
   <nav class="flow" id="flow"></nav>
 
   <div class="main">
+    <aside class="side">
+      <div class="tabs" id="tabs"><button data-t="result" class="on">結果</button><button data-t="cfg">設定</button><button data-t="files">檔案</button><button data-t="log">紀錄</button></div>
+      <div style="min-height:0;display:grid">
+        <div class="tabpane on" data-t="result" id="paneResult"></div>
+        <div class="tabpane" data-t="cfg"><div class="box"><h4>設定檔 <small id="cfgName" class="mono"></small></h4><dl class="kv" id="cfgKv"></dl></div></div>
+        <div class="tabpane" data-t="files" id="paneFiles"></div>
+        <div class="tabpane" data-t="log" style="grid-template-rows:auto minmax(0,1fr)"><div class="row" style="display:flex;justify-content:space-between;font-size:12px" ><span class="muted">即時執行紀錄</span><span id="jobState"></span></div><pre class="log" id="log"></pre></div>
+      </div>
+      <div class="foot">
+        <div class="row"><button id="runStage">只跑目前這一段</button><button id="runFrom">從這一段跑到最後</button></div>
+        <button class="gold" id="openShowcase" hidden>開啟展示台 ↗</button>
+        <button class="gold" id="toBatch" hidden title="把這次輸出的 Export 與 Images 建成收件批次，接著跑資源檢查 → 圖片檢查 → 展示台 → 靜態工房">送進收件批次 →</button>
+        <span id="footNote">寫入正式資料夾前會先備份舊檔到工作區。</span>
+      </div>
+    </aside>
+
     <div class="center">
       <div class="stage" id="stage">
         <div class="chips" id="chips"></div>
@@ -246,6 +274,7 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
           <div class="q" id="pQueue" hidden></div>
         </div>
         <div class="frame" id="frame"></div>
+        <div class="stagebar" id="stageBar"></div>
       </div>
       <div class="controls off" id="controls">
         <button class="playbtn" id="play" title="播放／暫停">❚❚</button>
@@ -255,25 +284,22 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
         <label>Spine 透明度 <input type="range" id="alpha" min="0" max="100" value="100" style="width:110px"><span class="mono" id="alphaVal">100%</span></label>
         <label><input type="checkbox" id="showRef" checked>設定稿底圖</label>
         <label><input type="checkbox" id="actual">實際像素 1:1</label>
+        <button id="resetView" title="回到符合畫面大小（也可以在預覽區雙擊）">重設視圖</button>
+        <span class="muted" style="font-size:11.5px">滾輪縮放・中鍵／右鍵拖曳・雙擊重設</span>
         <span class="offnote">輸出 Spine 後可在這裡播放與比對</span>
       </div>
     </div>
 
-    <aside class="side">
-      <div class="tabs" id="tabs"><button data-t="result" class="on">結果</button><button data-t="cfg">設定</button><button data-t="files">檔案</button><button data-t="log">紀錄</button></div>
-      <div style="min-height:0;display:grid">
-        <div class="tabpane on" data-t="result" id="paneResult"></div>
-        <div class="tabpane" data-t="cfg"><div class="box"><h4>設定檔 <small id="cfgName" class="mono"></small></h4><dl class="kv" id="cfgKv"></dl></div><div class="box curve"><h4>動態樣板 <small id="curveTitle"></small></h4><svg id="curve" viewBox="0 0 360 150"></svg><div class="legend" id="curveLegend"></div></div>
-          <div class="box form" id="animBox"><h4>調整動態 <small>改完按套用，從「Spine 動畫」重跑到最後</small></h4><select id="aTpl"></select><span class="note" id="aTplNote"></span><div id="aParams"></div>
-            <div class="err" id="aErr"></div><div class="row" style="display:flex;gap:6px"><button class="gold" id="aApply">套用並重跑動畫</button><button id="aReset">還原</button></div></div></div>
-        <div class="tabpane" data-t="files" id="paneFiles"></div>
-        <div class="tabpane" data-t="log" style="grid-template-rows:auto minmax(0,1fr)"><div class="row" style="display:flex;justify-content:space-between;font-size:12px" ><span class="muted">即時執行紀錄</span><span id="jobState"></span></div><pre class="log" id="log"></pre></div>
+    <aside class="side tune">
+      <div class="phead"><b>調整動態</b><small>換樣板、拖參數，曲線即時更新；按套用後從「Spine 動畫」重跑到最後</small></div>
+      <div class="pbody">
+        <div class="empty" id="tuneEmpty">選擇設定檔後可在這裡調整動態。新建設定時，樣板與參數在「確認設定」裡調。</div>
+        <div class="box curve" id="curveBox"><h4>目前動態 <small id="curveTitle"></small></h4><svg id="curve" viewBox="0 0 360 150"></svg><div class="legend" id="curveLegend"></div></div>
+        <div class="box form" id="animBox"><h4>樣板與參數 <small>下方為調整後預覽</small></h4><select id="aTpl"></select><span class="note" id="aTplNote"></span><div id="aParams"></div></div>
       </div>
-      <div class="foot">
-        <div class="row"><button id="runStage">只跑目前這一段</button><button id="runFrom">從這一段跑到最後</button></div>
-        <button class="gold" id="openShowcase" hidden>開啟展示台 ↗</button>
-        <button class="gold" id="toBatch" hidden title="把這次輸出的 Export 與 Images 建成收件批次，接著跑資源檢查 → 圖片檢查 → 展示台 → 靜態工房">送進收件批次 →</button>
-        <span id="footNote">寫入正式資料夾前會先備份舊檔到工作區。</span>
+      <div class="foot" id="tuneFoot">
+        <div class="err" id="aErr"></div>
+        <div class="row"><button class="gold" id="aApply">套用並重跑動畫</button><button id="aReset">還原</button></div>
       </div>
     </aside>
   </div>
@@ -354,7 +380,7 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
   // ---------- 丟 PSD：找原檔 → 分析 → 勾圖層、確認設定 → 開始 ----------
   let psdQueue = [], psdCreated = [], templates = null;
   function stageMsg(title, body) {
-    view = 'welcome'; S = null; destroyPlayer(); $('controls').classList.add('off'); $('prog').classList.remove('on');
+    view = 'welcome'; S = null; renderStageBar(false); destroyPlayer(); $('controls').classList.add('off'); $('prog').classList.remove('on');
     $('chips').innerHTML = '<span class="chip gold">丟入 PSD</span>'; $('res').textContent = '';
     $('frame').innerHTML = `<div class="welcome"><h2>${title}</h2>${body}</div>`;
     renderFlow(); renderSide();
@@ -466,7 +492,7 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
 
   // 尚未選設定檔：舞台顯示匯入指引
   async function showWelcome() {
-    view = 'welcome'; S = null;
+    view = 'welcome'; S = null; renderStageBar(false);
     const list = await loadConfigs('');
     try { localStorage.removeItem('symbol-anim-config'); } catch {}
     $('chips').innerHTML = '<span class="chip gold">匯入設定檔</span>'; $('res').textContent = '';
@@ -644,6 +670,7 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
   // ---------- 分頁（舞台內容） ----------
   function show(k) {
     if (!S) return;
+    if (k !== view) scDetail = false;
     view = k;
     const st = STAGES.find(s => s.key === k);
     $('chips').innerHTML = `<span class="chip gold">${st.name}</span><span class="chip">${esc(S.name)}</span>${$('spineDir').value.trim() ? '<span class="chip">試跑</span>' : ''}`;
@@ -653,8 +680,10 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
   }
   function renderStage() {
     const fr = $('frame');
-    const usePlayer = ['spine', 'size', 'verify'].includes(view) && app;
+    // 已輸出就一直能播：登記展示台這段也用播放器，登記狀態縮成下方一列（按「詳情」才看完整說明）
+    const usePlayer = (['spine', 'size', 'verify'].includes(view) || (view === 'showcase' && !scDetail)) && app;
     $('controls').classList.toggle('off', !usePlayer);
+    renderStageBar(usePlayer && view === 'showcase');
     if (usePlayer) {
       if (!fr.contains(app.view)) { fr.innerHTML = '<div class="canvaswrap" id="cw"></div>'; $('cw').append(app.view); }
       $('alpha').value = view === 'size' ? 50 : 100; applyAlpha();
@@ -732,6 +761,18 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
       <span style="font-size:12px;color:#cfcac0">${esc(p.name)}・${p.size.join('×')}・${p.regs.length} 個區域（放大 ${z.toFixed(1)}× 顯示；區域尺寸＝遊戲像素，↻＝旋轉擺放）</span></div>`;
   }
 
+  let scDetail = false;
+  function renderStageBar(on) {
+    const bar = $('stageBar'), sc = S?.showcase;
+    bar.classList.toggle('on', !!on);
+    if (!on) return;
+    const ok = sc?.rows?.length && sc.rows.every(r => r.ok), n = sc?.rows?.filter(r => r.ok).length || 0;
+    bar.innerHTML = !sc ? '<span>這個設定檔不登記展示台</span>'
+      : `<span class="${ok ? 'y' : ''}">${ok ? '✓ 已登記到展示台' : `展示台已登記 ${n}／${sc.rows.length}`}</span>${ok ? '<button class="gold" id="sbOpen">開啟展示台 ↗</button>' : ''}<button id="sbMore">詳情</button>`;
+    if (ok) $('sbOpen').onclick = openShowcase;
+    if (sc) $('sbMore').onclick = () => { scDetail = true; renderStage(); };
+  }
+
   function renderShowcaseStage(fr) {
     const sc = S.showcase;
     if (!sc) { fr.innerHTML = '<div class="empty-stage"><b>登記展示台</b><span>這個設定檔沒有 showcase 欄位，不登記。</span></div>'; return; }
@@ -742,8 +783,9 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
       ${sc.rows.map(r => `<tr><td><b>${esc(r.code)}</b></td><td class="mono">${esc(r.skel || '—')}</td><td>${esc(r.win || '—')}</td><td>${r.ok ? '<span class="y">已登記</span>' : r.skel ? '<span class="x">指向其他檔案</span>' : '未登記'}</td></tr>`).join('')}
       </tbody></table>
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">${ok ? `<button class="gold" id="openShowcase2" style="font-size:15px;padding:9px 20px">開啟展示台 ↗</button><span style="color:#b9b3a8;font-size:12px">在新分頁開這個專案的展示台；煉丹爐本機伺服器沒開會先幫你啟動。</span>`
-        : `<span style="color:#cfcac0">正式執行（不填試跑資料夾）跑完「登記展示台」後，這裡會出現開啟按鈕。</span>`}</div></div>`;
+        : `<span style="color:#cfcac0">正式執行（不填試跑資料夾）跑完「登記展示台」後，這裡會出現開啟按鈕。</span>`}${app ? '<button id="scBack">← 回到預覽</button>' : ''}</div></div>`;
     if (ok) $('openShowcase2').onclick = openShowcase;
+    if (app) $('scBack').onclick = () => { scDetail = false; renderStage(); };
   }
 
   // 開啟展示台：先開空白分頁（避免被擋），確認伺服器開著再導過去
@@ -902,7 +944,8 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
   // 設定分頁：改目前設定檔的樣板與參數，套用後從 Spine 動畫重跑
   let animSig = '', aEditor = null;
   async function renderAnimBox() {
-    $('animBox').style.display = S ? '' : 'none';
+    for (const id of ['curveBox', 'animBox', 'tuneFoot']) $(id).style.display = S ? '' : 'none';
+    $('tuneEmpty').style.display = S ? 'none' : '';
     if (!S) return;
     const sig = S.name + '|' + JSON.stringify(S.config.animation);
     if (sig === animSig) return;
@@ -928,7 +971,9 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
 
   // ---------- Spine 播放器 ----------
   let app = null, views = [], playing = true, userPaused = false, duration = 2, tt = 0;
-  function destroyPlayer() { if (app) { app.destroy(true, { children: true }); app = null; } views = []; }
+  function destroyPlayer() { if (app) { app.destroy(true, { children: true }); app = null; world = null; } views = []; }
+  // 播放器畫布填滿預覽區；內容放在 world 裡，縮放／平移只動 world（滾輪縮放、中鍵或右鍵拖曳、雙擊重設）
+  let world = null, CW = 0, CH = 0, userZoom = 1, panX = 0, panY = 0;
   async function buildPlayer() {
     destroyPlayer();
     const skels = S.exportFiles.filter(f => /\.skel$/i.test(f.path)), atlas = S.atlas[0];
@@ -936,7 +981,9 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
     const k = S.config.output.scale, cells = S.config.verify?.layout?.cells || {}, codes = S.config.symbols.map(s => s.code);
     const boxes = codes.map(c => cells[c] ? [Math.round((cells[c][2] - cells[c][0]) * k), Math.round((cells[c][3] - cells[c][1]) * k)] : [160, 160]);
     const GAP = 6, LABEL = 16, W = boxes.reduce((n, b) => n + b[0] + GAP, GAP), H = Math.max(...boxes.map(b => b[1])) + GAP * 2 + LABEL;
-    const a = new PIXI.Application({ width: W, height: H, backgroundColor: 0x1b1b1d, antialias: true });
+    const a = new PIXI.Application({ width: 300, height: 200, backgroundAlpha: 0, antialias: true, resolution: devicePixelRatio || 1, autoDensity: true });
+    const w = new PIXI.Container(); a.stage.addChild(w);
+    w.addChild(new PIXI.Graphics().lineStyle(1, 0xffffff, 0.2).beginFill(0x1b1b1d).drawRect(0, 0, W, H).endFill());
     const refTex = S.reference ? await PIXI.Assets.load(bust(fileUrl(S.reference), 1)).catch(() => null) : null;
     const anim = S.config.animation.name, rows = S.report?.rows || S.size?.rows || [];
     let x = GAP;
@@ -945,8 +992,8 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
       const skel = skels.find(f => f.path.replace(/\\/g, '/').endsWith('/' + (t?.skeleton || '#') + '.skel'));
       const ok = r && Object.values(r.pass).every(Boolean);
       const label = new PIXI.Text(`${code}${r ? (ok ? '  ✓ ' : '  ✗ ') + r.frame0.join('×') : ''}`, { fontFamily: 'Microsoft JhengHei', fontSize: 12, fill: r ? (ok ? 0x7fd6a4 : 0xff9a8b) : 0xb9b3a8 });
-      label.position.set(x, 1); a.stage.addChild(label);
-      const cell = new PIXI.Container(); cell.position.set(x, GAP + LABEL); a.stage.addChild(cell);
+      label.position.set(x, 1); w.addChild(label);
+      const cell = new PIXI.Container(); cell.position.set(x, GAP + LABEL); w.addChild(cell);
       cell.addChild(new PIXI.Graphics().beginFill(0x3a0f12).drawRect(0, 0, bw, bh).endFill());
       let ref = null;
       if (refTex && cells[code]) { const [x0, y0, x1, y1] = cells[code]; ref = new PIXI.Sprite(new PIXI.Texture(refTex.baseTexture, new PIXI.Rectangle(x0, y0, x1 - x0, y1 - y0))); ref.width = bw; ref.height = bh; cell.addChild(ref); }
@@ -957,23 +1004,60 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
         sp.state.setAnimation(0, anim, true); cell.addChild(sp);
         duration = data.findAnimation(anim)?.duration || duration;
         views.push({ sp, ref });
+      } else {
+        const t = new PIXI.Text('Export 裡沒有\n（還沒輸出）', { fontFamily: 'Microsoft JhengHei', fontSize: 12, fill: 0xb9b3a8, align: 'center' });
+        t.anchor.set(0.5); t.position.set(bw / 2, bh / 2); cell.addChild(t);
       }
       x += bw + GAP;
     }
-    app = a;
+    app = a; world = w; CW = W; CH = H; userZoom = 1; panX = panY = 0;
+    bindViewControls(a.view);
     $('scrub').max = Math.round(duration * (S.config.animation.fps || 30));
     applyAlpha(); applyRef();
     app.ticker.add(() => { if (playing) { tt = (tt + app.ticker.deltaMS / 1000 * +$('speed').value) % duration; setTime(tt); } });
     setTime(0);
-    if (['spine', 'size', 'verify'].includes(view)) renderStage();
+    if (['spine', 'size', 'verify', 'showcase'].includes(view)) renderStage();
   }
+  const fitZoom = (fw, fh) => $('actual').checked ? 1 : Math.min((fw - 16) / CW, (fh - 16) / CH);
   function fitPlayer() {
-    if (!app) return;
-    const fr = $('frame'), z = $('actual').checked ? 1 : Math.max(0.5, Math.min((fr.clientWidth - 8) / app.view.width, (fr.clientHeight - 8) / app.view.height));
-    app.view.style.width = Math.floor(app.view.width * z) + 'px'; app.view.style.height = Math.floor(app.view.height * z) + 'px';
-    $('res').textContent = `${(S.config.output.size || []).join('×')} 版面・Spine 1:1${$('actual').checked ? '' : `・顯示 ${z.toFixed(2)}×`}`;
+    if (!app || !world) return;
+    const fr = $('frame'), fw = fr.clientWidth, fh = fr.clientHeight;
+    if (!fw || !fh) return;
+    if (app.renderer.width / app.renderer.resolution !== fw || app.renderer.height / app.renderer.resolution !== fh) app.renderer.resize(fw, fh);
+    const z = fitZoom(fw, fh) * userZoom;
+    world.scale.set(z);
+    world.position.set(Math.round((fw - CW * z) / 2 + panX), Math.round((fh - CH * z) / 2 + panY));
+    $('res').textContent = `${(S.config.output.size || []).join('×')} 版面・Spine 1:1・顯示 ${z.toFixed(2)}×`;
   }
+  function resetView() { userZoom = 1; panX = panY = 0; fitPlayer(); }
+  function bindViewControls(cv) {
+    cv.addEventListener('wheel', e => {
+      e.preventDefault();
+      const fr = $('frame'), fw = fr.clientWidth, fh = fr.clientHeight, base = fitZoom(fw, fh);
+      const rect = cv.getBoundingClientRect(), px = e.clientX - rect.left, py = e.clientY - rect.top;
+      const z0 = base * userZoom, z1 = Math.min(16, Math.max(0.1, z0 * Math.exp(-e.deltaY * 0.0015)));
+      // 以游標為中心縮放：游標下的內容點不動
+      const wx = (px - world.position.x) / z0, wy = (py - world.position.y) / z0;
+      userZoom = z1 / base;
+      panX = px - wx * z1 - (fw - CW * z1) / 2; panY = py - wy * z1 - (fh - CH * z1) / 2;
+      fitPlayer();
+    }, { passive: false });
+    let drag = null;
+    cv.addEventListener('pointerdown', e => {
+      if (e.button !== 1 && e.button !== 2) return;
+      e.preventDefault(); drag = { x: e.clientX, y: e.clientY, px: panX, py: panY };
+      cv.setPointerCapture(e.pointerId); cv.classList.add('drag');
+    });
+    cv.addEventListener('pointermove', e => { if (!drag) return; panX = drag.px + e.clientX - drag.x; panY = drag.py + e.clientY - drag.y; fitPlayer(); });
+    const end = e => { if (!drag) return; drag = null; cv.classList.remove('drag'); try { cv.releasePointerCapture(e.pointerId); } catch {} };
+    cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+    cv.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });  // 中鍵不要觸發瀏覽器自動捲動
+    cv.addEventListener('contextmenu', e => e.preventDefault());
+    cv.addEventListener('dblclick', resetView);
+  }
+  $('resetView').onclick = resetView;
   addEventListener('resize', () => { fitPlayer(); if (view === 'export' && S) renderStage(); });
+  new ResizeObserver(() => fitPlayer()).observe($('frame'));  // 三欄寬度變動（視窗縮放、側欄捲軸）時重新縮放播放器
   function setTime(t) {
     if (!S) return;
     tt = t;
@@ -988,10 +1072,12 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
   const applyRef = () => views.forEach(v => v.ref && (v.ref.visible = $('showRef').checked));
   $('play').onclick = () => { playing = !playing; userPaused = !playing; $('play').textContent = playing ? '❚❚' : '▶'; };
   $('scrub').oninput = () => { playing = false; userPaused = true; $('play').textContent = '▶'; setTime(+$('scrub').value / (S.config.animation.fps || 30)); };
-  $('alpha').oninput = applyAlpha; $('showRef').onchange = applyRef; $('actual').onchange = fitPlayer;
+  $('alpha').oninput = applyAlpha; $('showRef').onchange = applyRef; $('actual').onchange = resetView;
 
   // ---------- 啟動 ----------
   // ---------- 本機小幫手 ----------
+  const UI_VERSION = '0.3.0';  // 跟 web/server.js 的 VERSION 一致（build_site.js 會檢查）
+  $('uiVer').textContent = 'v' + UI_VERSION;
   let helper = null;
   const checksHtml = h => `<div class="checks">${h.checks.map(c => `<div class="${c.ok ? 'y' : 'n'}"><i>${c.ok ? '✓' : '✗'}</i><span>${esc(c.name)}${c.ok ? '' : `<small>　${esc(c.hint)}</small>`}</span></div>`).join('')}</div>`;
   async function connectHelper() {
@@ -1001,11 +1087,14 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
     } catch (e) { helper = { error: e.name === 'AbortError' ? '逾時' : e.message }; }
     const chip = $('helperChip'), bad = helper.checks?.filter(c => !c.ok && !c.optional) || [];
     chip.className = 'helper ' + (helper.error ? 'bad' : bad.length ? 'warn' : 'ok');
-    chip.textContent = helper.error ? '本機小幫手：未連線' : bad.length ? `本機小幫手：缺 ${bad.length} 項` : `本機小幫手 ✓ v${helper.version}`;
+    const old = !helper.error && helper.version !== UI_VERSION;
+    chip.className = 'helper ' + (helper.error ? 'bad' : bad.length || old ? 'warn' : 'ok');
+    chip.textContent = helper.error ? '本機小幫手：未連線' : bad.length ? `本機小幫手：缺 ${bad.length} 項` : old ? `本機小幫手 v${helper.version}（網頁 v${UI_VERSION}，請更新）` : `本機小幫手 ✓ v${helper.version}`;
+    chip.title = old ? '小幫手和網頁版本不同，新功能可能不能用：重新下載安裝程式，裝在同一個位置即可（設定與工作區會保留）' : '';
     return !helper.error;
   }
   function showOffline() {
-    view = 'offline'; S = null;
+    view = 'offline'; S = null; renderStageBar(false);
     $('controls').classList.add('off'); destroyPlayer();
     $('chips').innerHTML = '<span class="chip">未連線</span>'; $('res').textContent = '';
     const online = API !== '';
@@ -1026,7 +1115,8 @@ pre.log { margin: 0; background: #1b1c1f; color: #e7e3da; border-radius: 8px; pa
   $('helperChip').onclick = async () => {
     if (!await connectHelper()) return showOffline();
     const bad = helper.checks.filter(c => !c.ok && !c.optional);
-    toast(bad.length ? `缺：${bad.map(c => c.name).join('、')}` : `本機小幫手 v${helper.version}，環境都齊全（工作根目錄 ${helper.workRoot}）`, !!bad.length);
+    const old = helper.version !== UI_VERSION;
+    toast(bad.length ? `缺：${bad.map(c => c.name).join('、')}` : old ? `本機小幫手 v${helper.version} 比網頁 v${UI_VERSION} 舊：請重新下載安裝程式，裝在同一個位置` : `本機小幫手 v${helper.version}，環境都齊全（工作根目錄 ${helper.workRoot}）`, !!bad.length || old);
   };
   let retryTimer = null;
   async function boot() {
